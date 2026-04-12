@@ -96,7 +96,7 @@ class CalendarState(rx.State):
 
     @rx.var
     def hours_list(self) -> list[str]:
-        return [f"{h:02d}:00" for h in range(6, 23)]
+        return [f"{h:02d}:00" for h in range(0, 24)]
 
     @rx.var
     async def week_columns(
@@ -156,9 +156,9 @@ class CalendarState(rx.State):
                 }
                 day_leaves.append(cl)
         hours_data: list[dict[str, str | list[dict[str, str | int]]]] = []
-        for h in range(6, 23):
+        for h in range(0, 24):
             hour_str = f"{h:02d}:00"
-            hour_next = f"{h + 1:02d}:00"
+            hour_next = f"{h + 1:02d}:00" if h < 23 else "24:00"
             active_leaves: list[dict[str, str | int]] = []
             for cl in day_leaves:
                 if str(cl["start_time"]) < hour_next and str(cl["end_time"]) > hour_str:
