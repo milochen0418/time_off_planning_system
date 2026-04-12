@@ -6,8 +6,8 @@ from time_off_planning_system.store import store, Message
 
 
 class MessageState(rx.State):
-    messages: list[dict] = []
-    next_msg_id: int = 1
+    _rev: int = 0
+    _last_store_rev: int = 0
     form_employee_id: str = ""
     form_name: str = ""
     form_email: str = ""
@@ -17,20 +17,20 @@ class MessageState(rx.State):
     form_error: str = ""
     form_success: str = ""
 
-    def _sync_to_store(self):
-        """Write current state messages into the shared store for the REST API."""
-        store.messages = list(self.messages)
-        store._next_msg_id = self.next_msg_id
+    @rx.var
+    def messages(self) -> list[Message]:
+        _ = self._rev
+        return store.messages
 
     @rx.var
     def sorted_messages(self) -> list[Message]:
-        return sorted(self.messages, key=lambda x: x["submitted_at"], reverse=True)
+        _ = self._rev
+        return sorted(store.messages, key=lambda x: x["submitted_at"], reverse=True)
 
     @rx.event
     def load_messages(self):
-        """Sync from store on page load (picks up any API-created data)."""
-        self.messages = list(store.messages)
-        self.next_msg_id = store._next_msg_id
+        """Bump revision to force recompute from store."""
+        self._rev += 1
 
     @rx.event
     def set_contact_method(self, value: str):
@@ -52,19 +52,16 @@ class MessageState(rx.State):
         ):
             self.form_error = "請填寫所有欄位"
             return
-        new_msg: dict = {
-            "id": self.next_msg_id,
-            "employee_id": self.form_employee_id,
-            "name": self.form_name,
-            "email": self.form_email,
-            "contact_method": self.form_contact_method,
-            "contact_value": self.form_contact_value,
-            "message": self.form_message,
-            "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        self.messages.append(new_msg)
-        self.next_msg_id += 1
-        self._sync_to_store()
+        store.add_message(
+            employee_id=self.form_employee_id,
+            name=self.form_name,
+            email=self.form_email,
+            contact_method=self.form_contact_method,
+            contact_value=self.form_contact_value,
+            message=self.form_message,
+            submitted_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self._rev += 1
         self.form_employee_id = ""
         self.form_name = ""
         self.form_email = ""
@@ -74,6 +71,13 @@ class MessageState(rx.State):
 
     @rx.event
     def delete_message(self, msg_id: int):
-        self.messages = [m for m in self.messages if m["id"] != msg_id]
-        self._sync_to_store()
+        store.delete_message(msg_id)
+        self._rev += 1
         yield rx.toast("留言已刪除")
+
+    @rx.event
+    def check_store_update(self, _timestamp: str):
+        """Called periodically by rx.moment to detect external store changes."""
+        if store.revision != self._last_store_rev:
+            self._last_store_rev = store.revision
+            self._rev += 1

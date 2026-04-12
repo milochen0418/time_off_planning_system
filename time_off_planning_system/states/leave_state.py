@@ -6,8 +6,8 @@ from time_off_planning_system.store import store, Leave
 
 
 class LeaveState(rx.State):
-    leaves: list[dict] = []
-    next_id: int = 1
+    _rev: int = 0
+    _last_store_rev: int = 0
     form_date: str = ""
     form_start_time: str = ""
     form_end_time: str = ""
@@ -16,29 +16,25 @@ class LeaveState(rx.State):
     show_form: bool = False
     form_error: str = ""
 
-    def _sync_to_store(self):
-        """Write current state leaves into the shared store for the REST API."""
-        store.leaves = list(self.leaves)
-        store._next_leave_id = self.next_id
-
     @rx.var
     async def my_leaves(self) -> list[Leave]:
+        _ = self._rev
         from time_off_planning_system.states.auth_state import AuthState
 
         auth = await self.get_state(AuthState)
         user_id = auth.current_user_id
-        filtered = [L for L in self.leaves if L["user_id"] == user_id]
+        filtered = [L for L in store.leaves if L["user_id"] == user_id]
         return sorted(filtered, key=lambda x: (x["leave_date"], x["start_time"]))
 
     @rx.var
     def all_leaves(self) -> list[Leave]:
-        return self.leaves
+        _ = self._rev
+        return store.leaves
 
     @rx.event
     def load_leaves(self):
-        """Sync from store on page load (picks up any API-created data)."""
-        self.leaves = list(store.leaves)
-        self.next_id = store._next_leave_id
+        """Bump revision to force recompute from store (e.g. picks up API data)."""
+        self._rev += 1
 
     @rx.event
     def open_add_form(self):
@@ -52,7 +48,7 @@ class LeaveState(rx.State):
 
     @rx.event
     def open_edit_form(self, leave_id: int):
-        leave = next((L for L in self.leaves if L["id"] == leave_id), None)
+        leave = next((L for L in store.leaves if L["id"] == leave_id), None)
         if leave:
             self.form_date = leave["leave_date"]
             self.form_start_time = leave["start_time"]
@@ -79,7 +75,7 @@ class LeaveState(rx.State):
             self.form_error = "開始時間必須早於結束時間"
             return
         user_id = auth.current_user_id
-        for L in self.leaves:
+        for L in store.leaves:
             if self.editing_id != -1 and L["id"] == self.editing_id:
                 continue
             if L["user_id"] == user_id and L["leave_date"] == self.form_date:
@@ -92,35 +88,40 @@ class LeaveState(rx.State):
                     )
                     return
         if self.editing_id == -1:
-            new_leave: dict = {
-                "id": self.next_id,
-                "user_id": user_id,
-                "leave_date": self.form_date,
-                "start_time": self.form_start_time,
-                "end_time": self.form_end_time,
-                "note": self.form_note,
-                "display_name": auth.current_display_name,
-            }
-            self.leaves.append(new_leave)
-            self.next_id += 1
+            store.add_leave(
+                user_id=user_id,
+                leave_date=self.form_date,
+                start_time=self.form_start_time,
+                end_time=self.form_end_time,
+                note=self.form_note,
+                display_name=auth.current_display_name,
+            )
             yield rx.toast("成功新增休假", duration=3000)
         else:
-            for i, L in enumerate(self.leaves):
+            for i, L in enumerate(store.leaves):
                 if L["id"] == self.editing_id:
-                    self.leaves[i] = {
+                    store.leaves[i] = {
                         **L,
                         "leave_date": self.form_date,
                         "start_time": self.form_start_time,
                         "end_time": self.form_end_time,
                         "note": self.form_note,
                     }
+                    store._bump()
                     break
             yield rx.toast("成功更新休假", duration=3000)
-        self._sync_to_store()
+        self._rev += 1
         self.show_form = False
 
     @rx.event
     def delete_leave(self, leave_id: int):
-        self.leaves = [L for L in self.leaves if L["id"] != leave_id]
-        self._sync_to_store()
+        store.delete_leave(leave_id)
+        self._rev += 1
         yield rx.toast("已刪除休假記錄")
+
+    @rx.event
+    def check_store_update(self, _timestamp: str):
+        """Called periodically by rx.moment to detect external store changes."""
+        if store.revision != self._last_store_rev:
+            self._last_store_rev = store.revision
+            self._rev += 1
