@@ -6,15 +6,8 @@ from time_off_planning_system.store import store, User
 
 
 class AuthState(rx.State):
-    users: list[dict] = [
-        {
-            "id": 1,
-            "username": "admin",
-            "password_hash": "admin123",
-            "display_name": "管理員",
-        }
-    ]
-    next_user_id: int = 2
+    _rev: int = 0
+    _last_store_rev: int = 0
     logged_in: bool = False
     current_user_id: int = -1
     current_username: str = ""
@@ -29,16 +22,17 @@ class AuthState(rx.State):
     register_error: str = ""
     register_success: str = ""
 
-    def _sync_to_store(self):
-        """Write current state users into the shared store for the REST API."""
-        store.users = list(self.users)
-        store._next_user_id = self.next_user_id
+    @rx.var
+    def users(self) -> list[User]:
+        # Reference _rev so Reflex recomputes when data changes
+        _ = self._rev
+        return store.users
 
     @rx.event
     def login(self):
         self.login_error = ""
         found_user = None
-        for u in self.users:
+        for u in store.users:
             if (
                 u["username"] == self.login_username
                 and u["password_hash"] == self.login_password
@@ -70,18 +64,11 @@ class AuthState(rx.State):
         if self.reg_password != self.reg_confirm_password:
             self.register_error = "密碼不一致"
             return
-        if any(u["username"] == self.reg_username for u in self.users):
+        if store.find_user_by_name(self.reg_username):
             self.register_error = "此帳號已被註冊"
             return
-        new_user: dict = {
-            "id": self.next_user_id,
-            "username": self.reg_username,
-            "password_hash": self.reg_password,
-            "display_name": self.reg_display_name,
-        }
-        self.users.append(new_user)
-        self.next_user_id += 1
-        self._sync_to_store()
+        store.add_user(self.reg_username, self.reg_password, self.reg_display_name)
+        self._rev += 1
         self.register_success = "註冊成功！請前往登入"
         self.reg_username = ""
         self.reg_password = ""
@@ -105,3 +92,10 @@ class AuthState(rx.State):
     def check_logged_in(self):
         if self.logged_in:
             return rx.redirect("/my-leaves")
+
+    @rx.event
+    def check_store_update(self, _timestamp: str):
+        """Called periodically by rx.moment to detect external store changes."""
+        if store.revision != self._last_store_rev:
+            self._last_store_rev = store.revision
+            self._rev += 1

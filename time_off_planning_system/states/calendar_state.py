@@ -107,7 +107,8 @@ class CalendarState(rx.State):
         from time_off_planning_system.states.leave_state import LeaveState
 
         leave_state = await self.get_state(LeaveState)
-        all_leaves = leave_state.leaves
+        _ = leave_state._rev
+        all_leaves = store.leaves
         cols: list[dict[str, str | int | bool | list[dict[str, str | int]]]] = []
         for d in self.week_dates:
             date_str = d["date_str"]
@@ -141,7 +142,8 @@ class CalendarState(rx.State):
         from time_off_planning_system.states.leave_state import LeaveState
 
         leave_state = await self.get_state(LeaveState)
-        all_leaves = leave_state.leaves
+        _ = leave_state._rev
+        all_leaves = store.leaves
         date_str = self.current_date_str
         day_leaves: list[dict[str, str | int]] = []
         for L in all_leaves:

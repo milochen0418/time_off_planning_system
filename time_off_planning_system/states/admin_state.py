@@ -57,11 +57,8 @@ class AdminState(rx.State):
         self.show_user_form = True
 
     @rx.event
-    async def open_edit_user_form(self, user_id: int):
-        from time_off_planning_system.states.auth_state import AuthState
-
-        auth = await self.get_state(AuthState)
-        user = next((u for u in auth.users if u["id"] == user_id), None)
+    def open_edit_user_form(self, user_id: int):
+        user = store.find_user(user_id)
         if user:
             self.form_username = user["username"]
             self.form_password = user["password_hash"]
@@ -79,7 +76,6 @@ class AdminState(rx.State):
     async def save_user(self):
         from time_off_planning_system.states.auth_state import AuthState
 
-        auth = await self.get_state(AuthState)
         if (
             not self.form_username
             or not self.form_password
@@ -88,30 +84,24 @@ class AdminState(rx.State):
             self.form_error = "請填寫所有欄位"
             return
         if self.editing_user_id == -1:
-            if any(u["username"] == self.form_username for u in auth.users):
+            if store.find_user_by_name(self.form_username):
                 self.form_error = "此帳號已被使用"
                 return
-            new_user: dict = {
-                "id": auth.next_user_id,
-                "username": self.form_username,
-                "password_hash": self.form_password,
-                "display_name": self.form_display_name,
-            }
-            auth.users.append(new_user)
-            auth.next_user_id += 1
+            store.add_user(
+                self.form_username, self.form_password, self.form_display_name
+            )
             yield rx.toast(f"成功新增使用者: {self.form_display_name}")
         else:
-            for i, u in enumerate(auth.users):
-                if u["id"] == self.editing_user_id:
-                    auth.users[i] = {
-                        **u,
-                        "username": self.form_username,
-                        "password_hash": self.form_password,
-                        "display_name": self.form_display_name,
-                    }
-                    break
+            store.update_user(
+                self.editing_user_id,
+                username=self.form_username,
+                password_hash=self.form_password,
+                display_name=self.form_display_name,
+            )
             yield rx.toast(f"成功更新使用者資料")
-        auth._sync_to_store()
+        # Bump AuthState._rev so its `users` computed var recomputes
+        auth = await self.get_state(AuthState)
+        auth._rev += 1
         self.show_user_form = False
 
     @rx.event
@@ -121,7 +111,7 @@ class AdminState(rx.State):
         if user_id == 1:
             yield rx.toast("不能刪除預設管理員帳號")
             return
+        store.delete_user(user_id)
         auth = await self.get_state(AuthState)
-        auth.users = [u for u in auth.users if u["id"] != user_id]
-        auth._sync_to_store()
+        auth._rev += 1
         yield rx.toast("使用者已刪除")

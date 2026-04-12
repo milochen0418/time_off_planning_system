@@ -183,14 +183,13 @@ def update_leave(leave_id: int, user_id: int, body: LeaveUpdate):
     leave["start_time"] = body.start_time
     leave["end_time"] = body.end_time
     leave["note"] = body.note
+    store._bump()
     return leave
 
 
 @router.delete("/leaves/{leave_id}")
 def delete_leave(leave_id: int):
-    original_len = len(store.leaves)
-    store.leaves = [L for L in store.leaves if L["id"] != leave_id]
-    if len(store.leaves) == original_len:
+    if not store.delete_leave(leave_id):
         raise HTTPException(status_code=404, detail="休假紀錄不存在")
     return {"message": "已刪除休假記錄"}
 
@@ -317,6 +316,7 @@ def update_user(user_id: int, body: UserUpdate):
     user["username"] = body.username
     user["password_hash"] = body.password
     user["display_name"] = body.display_name
+    store._bump()
     return {"id": user["id"], "username": user["username"], "display_name": user["display_name"]}
 
 
@@ -324,9 +324,7 @@ def update_user(user_id: int, body: UserUpdate):
 def delete_user(user_id: int):
     if user_id == 1:
         raise HTTPException(status_code=400, detail="不能刪除預設管理員帳號")
-    original_len = len(store.users)
-    store.users = [u for u in store.users if u["id"] != user_id]
-    if len(store.users) == original_len:
+    if not store.delete_user(user_id):
         raise HTTPException(status_code=404, detail="使用者不存在")
     return {"message": "使用者已刪除"}
 
@@ -359,8 +357,6 @@ def create_message(body: MessageCreate):
 
 @router.delete("/messages/{msg_id}")
 def delete_message(msg_id: int):
-    original_len = len(store.messages)
-    store.messages = [m for m in store.messages if m["id"] != msg_id]
-    if len(store.messages) == original_len:
+    if not store.delete_message(msg_id):
         raise HTTPException(status_code=404, detail="留言不存在")
     return {"message": "留言已刪除"}

@@ -42,6 +42,7 @@ class DataStore:
     """Process-level singleton that holds all application data."""
 
     def __init__(self) -> None:
+        self.revision: int = 0
         self.users: list[User] = [
             {
                 "id": 1,
@@ -55,6 +56,10 @@ class DataStore:
         self._next_user_id: int = 2
         self._next_leave_id: int = 1
         self._next_msg_id: int = 1
+
+    def _bump(self) -> None:
+        """Increment global revision so polling clients detect changes."""
+        self.revision += 1
 
     # ── User helpers ──────────────────────────────────────────────────────
 
@@ -73,7 +78,23 @@ class DataStore:
         }
         self.users.append(new_user)
         self._next_user_id += 1
+        self._bump()
         return new_user
+
+    def update_user(self, user_id: int, **fields: str) -> User | None:
+        user = self.find_user(user_id)
+        if user:
+            user.update(fields)  # type: ignore[arg-type]
+            self._bump()
+        return user
+
+    def delete_user(self, user_id: int) -> bool:
+        before = len(self.users)
+        self.users = [u for u in self.users if u["id"] != user_id]
+        if len(self.users) < before:
+            self._bump()
+            return True
+        return False
 
     # ── Leave helpers ─────────────────────────────────────────────────────
 
@@ -97,7 +118,16 @@ class DataStore:
         }
         self.leaves.append(new_leave)
         self._next_leave_id += 1
+        self._bump()
         return new_leave
+
+    def delete_leave(self, leave_id: int) -> bool:
+        before = len(self.leaves)
+        self.leaves = [lv for lv in self.leaves if lv["id"] != leave_id]
+        if len(self.leaves) < before:
+            self._bump()
+            return True
+        return False
 
     # ── Message helpers ───────────────────────────────────────────────────
 
@@ -123,7 +153,16 @@ class DataStore:
         }
         self.messages.append(new_msg)
         self._next_msg_id += 1
+        self._bump()
         return new_msg
+
+    def delete_message(self, msg_id: int) -> bool:
+        before = len(self.messages)
+        self.messages = [m for m in self.messages if m["id"] != msg_id]
+        if len(self.messages) < before:
+            self._bump()
+            return True
+        return False
 
 
 # Module-level singleton — imported by both states and api

@@ -817,6 +817,10 @@ def admin_dashboard_page() -> rx.Component:
             ),
             class_name="min-h-screen bg-slate-50 font-['Inter']",
         ),
+        # Hidden polling timers for cross-tab/API sync
+        rx.moment(interval=3000, on_change=AuthState.check_store_update, display="none"),
+        rx.moment(interval=3000, on_change=LeaveState.check_store_update, display="none"),
+        rx.moment(interval=3000, on_change=MessageState.check_store_update, display="none"),
         on_mount=AdminState.check_admin_auth,
     )
 
