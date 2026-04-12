@@ -1215,8 +1215,16 @@ def calendar_page() -> rx.Component:
     )
 
 
+# Mount REST API so Flet / mobile clients share the same data
+from fastapi import FastAPI as _FastAPI
+from time_off_planning_system.api import router as api_router
+
+_api_app = _FastAPI()
+_api_app.include_router(api_router)
+
 app = rx.App(
     theme=rx.theme(appearance="light"),
+    api_transformer=_api_app,
     head_components=[
         rx.el.link(rel="preconnect", href="https://fonts.googleapis.com"),
         rx.el.link(rel="preconnect", href="https://fonts.gstatic.com", cross_origin=""),
@@ -1226,6 +1234,7 @@ app = rx.App(
         ),
     ],
 )
+
 app.add_page(index, route="/")
 app.add_page(login_page, route="/login")
 app.add_page(register_page, route="/register")
