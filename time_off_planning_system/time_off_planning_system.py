@@ -991,9 +991,13 @@ def day_view() -> rx.Component:
                     CalendarState.display_title,
                     class_name="text-lg font-bold text-gray-900",
                 ),
-                class_name="p-4 border-b border-gray-200 bg-gray-50",
+                class_name="p-4 border-b border-gray-200 bg-gray-50 sticky top-0 z-10",
             ),
-            rx.foreach(CalendarState.day_hours, day_hour_row),
+            rx.el.div(
+                rx.foreach(CalendarState.day_hours, day_hour_row),
+                class_name="overflow-y-auto",
+                style={"max_height": "calc(100vh - 220px)"},
+            ),
             class_name="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden",
         )
     )
