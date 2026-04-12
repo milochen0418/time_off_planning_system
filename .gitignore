@@ -8,6 +8,9 @@ assets/external/
 __pycache__/
 /app/__pycache__/
 
+# Poetry virtual environment
+.venv/
+
 
 # Ignore uploaded files
 uploaded_files/
