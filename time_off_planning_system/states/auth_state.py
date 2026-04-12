@@ -2,15 +2,19 @@ import reflex as rx
 import asyncio
 from typing import Optional, TypedDict
 
-
-class User(TypedDict):
-    id: int
-    username: str
-    password_hash: str
-    display_name: str
+from time_off_planning_system.store import store, User
 
 
 class AuthState(rx.State):
+    users: list[dict] = [
+        {
+            "id": 1,
+            "username": "admin",
+            "password_hash": "admin123",
+            "display_name": "管理員",
+        }
+    ]
+    next_user_id: int = 2
     logged_in: bool = False
     current_user_id: int = -1
     current_username: str = ""
@@ -24,14 +28,11 @@ class AuthState(rx.State):
     reg_display_name: str = ""
     register_error: str = ""
     register_success: str = ""
-    users: list[User] = [
-        {
-            "id": 1,
-            "username": "admin",
-            "password_hash": "admin123",
-            "display_name": "管理員",
-        }
-    ]
+
+    def _sync_to_store(self):
+        """Write current state users into the shared store for the REST API."""
+        store.users = list(self.users)
+        store._next_user_id = self.next_user_id
 
     @rx.event
     def login(self):
@@ -69,17 +70,18 @@ class AuthState(rx.State):
         if self.reg_password != self.reg_confirm_password:
             self.register_error = "密碼不一致"
             return
-        for u in self.users:
-            if u["username"] == self.reg_username:
-                self.register_error = "此帳號已被註冊"
-                return
-        new_user: User = {
-            "id": len(self.users) + 1,
+        if any(u["username"] == self.reg_username for u in self.users):
+            self.register_error = "此帳號已被註冊"
+            return
+        new_user: dict = {
+            "id": self.next_user_id,
             "username": self.reg_username,
             "password_hash": self.reg_password,
             "display_name": self.reg_display_name,
         }
         self.users.append(new_user)
+        self.next_user_id += 1
+        self._sync_to_store()
         self.register_success = "註冊成功！請前往登入"
         self.reg_username = ""
         self.reg_password = ""

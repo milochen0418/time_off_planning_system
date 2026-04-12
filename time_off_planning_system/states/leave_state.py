@@ -2,19 +2,12 @@ import reflex as rx
 from typing import TypedDict
 import logging
 
-
-class Leave(TypedDict):
-    id: int
-    user_id: int
-    leave_date: str
-    start_time: str
-    end_time: str
-    note: str
-    display_name: str
+from time_off_planning_system.store import store, Leave
 
 
 class LeaveState(rx.State):
-    leaves: list[Leave] = []
+    leaves: list[dict] = []
+    next_id: int = 1
     form_date: str = ""
     form_start_time: str = ""
     form_end_time: str = ""
@@ -22,7 +15,11 @@ class LeaveState(rx.State):
     editing_id: int = -1
     show_form: bool = False
     form_error: str = ""
-    next_id: int = 1
+
+    def _sync_to_store(self):
+        """Write current state leaves into the shared store for the REST API."""
+        store.leaves = list(self.leaves)
+        store._next_leave_id = self.next_id
 
     @rx.var
     async def my_leaves(self) -> list[Leave]:
@@ -39,7 +36,9 @@ class LeaveState(rx.State):
 
     @rx.event
     def load_leaves(self):
-        pass
+        """Sync from store on page load (picks up any API-created data)."""
+        self.leaves = list(store.leaves)
+        self.next_id = store._next_leave_id
 
     @rx.event
     def open_add_form(self):
@@ -93,7 +92,7 @@ class LeaveState(rx.State):
                     )
                     return
         if self.editing_id == -1:
-            new_leave: Leave = {
+            new_leave: dict = {
                 "id": self.next_id,
                 "user_id": user_id,
                 "leave_date": self.form_date,
@@ -108,15 +107,20 @@ class LeaveState(rx.State):
         else:
             for i, L in enumerate(self.leaves):
                 if L["id"] == self.editing_id:
-                    self.leaves[i]["leave_date"] = self.form_date
-                    self.leaves[i]["start_time"] = self.form_start_time
-                    self.leaves[i]["end_time"] = self.form_end_time
-                    self.leaves[i]["note"] = self.form_note
+                    self.leaves[i] = {
+                        **L,
+                        "leave_date": self.form_date,
+                        "start_time": self.form_start_time,
+                        "end_time": self.form_end_time,
+                        "note": self.form_note,
+                    }
                     break
             yield rx.toast("成功更新休假", duration=3000)
+        self._sync_to_store()
         self.show_form = False
 
     @rx.event
     def delete_leave(self, leave_id: int):
         self.leaves = [L for L in self.leaves if L["id"] != leave_id]
+        self._sync_to_store()
         yield rx.toast("已刪除休假記錄")

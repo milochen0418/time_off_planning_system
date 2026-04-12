@@ -1,6 +1,6 @@
 import reflex as rx
 from typing import TypedDict, Optional
-from time_off_planning_system.states.auth_state import AuthState, User
+from time_off_planning_system.store import store, User
 
 
 class AdminState(rx.State):
@@ -58,6 +58,8 @@ class AdminState(rx.State):
 
     @rx.event
     async def open_edit_user_form(self, user_id: int):
+        from time_off_planning_system.states.auth_state import AuthState
+
         auth = await self.get_state(AuthState)
         user = next((u for u in auth.users if u["id"] == user_id), None)
         if user:
@@ -75,6 +77,9 @@ class AdminState(rx.State):
 
     @rx.event
     async def save_user(self):
+        from time_off_planning_system.states.auth_state import AuthState
+
+        auth = await self.get_state(AuthState)
         if (
             not self.form_username
             or not self.form_password
@@ -82,35 +87,41 @@ class AdminState(rx.State):
         ):
             self.form_error = "請填寫所有欄位"
             return
-        auth = await self.get_state(AuthState)
         if self.editing_user_id == -1:
-            if any((u["username"] == self.form_username for u in auth.users)):
+            if any(u["username"] == self.form_username for u in auth.users):
                 self.form_error = "此帳號已被使用"
                 return
-            max_id = max([u["id"] for u in auth.users], default=0)
-            new_user: User = {
-                "id": max_id + 1,
+            new_user: dict = {
+                "id": auth.next_user_id,
                 "username": self.form_username,
                 "password_hash": self.form_password,
                 "display_name": self.form_display_name,
             }
             auth.users.append(new_user)
+            auth.next_user_id += 1
             yield rx.toast(f"成功新增使用者: {self.form_display_name}")
         else:
             for i, u in enumerate(auth.users):
                 if u["id"] == self.editing_user_id:
-                    auth.users[i]["username"] = self.form_username
-                    auth.users[i]["password_hash"] = self.form_password
-                    auth.users[i]["display_name"] = self.form_display_name
+                    auth.users[i] = {
+                        **u,
+                        "username": self.form_username,
+                        "password_hash": self.form_password,
+                        "display_name": self.form_display_name,
+                    }
                     break
             yield rx.toast(f"成功更新使用者資料")
+        auth._sync_to_store()
         self.show_user_form = False
 
     @rx.event
     async def delete_user(self, user_id: int):
-        auth = await self.get_state(AuthState)
+        from time_off_planning_system.states.auth_state import AuthState
+
         if user_id == 1:
             yield rx.toast("不能刪除預設管理員帳號")
             return
+        auth = await self.get_state(AuthState)
         auth.users = [u for u in auth.users if u["id"] != user_id]
+        auth._sync_to_store()
         yield rx.toast("使用者已刪除")

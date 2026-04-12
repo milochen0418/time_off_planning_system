@@ -9,6 +9,10 @@ packages = [{include = "time_off_planning_system"}]
 [tool.poetry.dependencies]
 python = "~3.11"
 reflex = "0.8.26"
+flet = "*"
+httpx = "*"
+uvicorn = "*"
+fastapi = "*"
 
 [tool.poetry.group.dev.dependencies]
 playwright = "*"
