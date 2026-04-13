@@ -344,7 +344,7 @@ def build_calendar_page(page: ft.Page):
     now = datetime.now()
     state = {"year": now.year, "month": now.month, "day": now.day, "mode": "month"}
     title_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD)
-    calendar_content = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+    calendar_content = ft.Column(spacing=0)
 
     def _title():
         y, m, d, mode = state["year"], state["month"], state["day"], state["mode"]
@@ -380,9 +380,9 @@ def build_calendar_page(page: ft.Page):
         weekday_headers = ["日", "一", "二", "三", "四", "五", "六"]
         header_row = ft.Row(
             [ft.Container(ft.Text(w, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER, color=GRAY_500),
-                          width=80, alignment=ft.Alignment(0, 0))
+                          height=24, alignment=ft.Alignment(0, 0), expand=True)
              for w in weekday_headers],
-            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=0,
         )
         calendar_content.controls.append(header_row)
         for week in data["grid"]:
@@ -390,7 +390,7 @@ def build_calendar_page(page: ft.Page):
             for cell in week:
                 day_num = cell["day"]
                 if day_num == 0:
-                    row_controls.append(ft.Container(width=80, height=70))
+                    row_controls.append(ft.Container(height=70, expand=True))
                     continue
                 items: list[ft.Control] = []
                 day_color = INDIGO if cell.get("is_today") else GRAY_900
@@ -413,12 +413,12 @@ def build_calendar_page(page: ft.Page):
 
                 row_controls.append(ft.Container(
                     ft.Column(items, spacing=1, tight=True),
-                    width=80, height=70, padding=4,
+                    height=70, padding=4, expand=True,
                     border=ft.border.all(1, GRAY_200),
                     bgcolor="white" if not cell.get("is_today") else INDIGO_LIGHT,
                     on_click=_click_day,
                 ))
-            calendar_content.controls.append(ft.Row(row_controls, alignment=ft.MainAxisAlignment.CENTER))
+            calendar_content.controls.append(ft.Row(row_controls, spacing=0))
 
     def _build_week_view():
         data = api.get_calendar_week(state["year"], state["month"], state["day"])
@@ -530,7 +530,8 @@ def build_calendar_page(page: ft.Page):
 
     _refresh()
 
-    return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content], expand=True)
+    return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content],
+                     scroll=ft.ScrollMode.AUTO, expand=True)
 
 
 # ───────────────────────────────────────────────────────────────────────────
