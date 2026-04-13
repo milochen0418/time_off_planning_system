@@ -49,11 +49,17 @@ class DataStore:
                 "username": "admin",
                 "password_hash": "admin123",
                 "display_name": "管理員",
-            }
+            },
+            {
+                "id": 2,
+                "username": "m1",
+                "password_hash": "m1",
+                "display_name": "m1",
+            },
         ]
         self.leaves: list[Leave] = []
         self.messages: list[Message] = []
-        self._next_user_id: int = 2
+        self._next_user_id: int = 3
         self._next_leave_id: int = 1
         self._next_msg_id: int = 1
 
