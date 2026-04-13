@@ -7,9 +7,8 @@ because the Views-based routing does not render on Flet mobile (APK).
 
 from __future__ import annotations
 
+import asyncio
 import calendar as _calendar
-import threading
-import traceback
 from datetime import datetime, timedelta
 
 import flet as ft
@@ -25,8 +24,9 @@ _editing_leave_id: list[int | None] = [None]
 # Background polling state
 _last_revision: list[int] = [0]
 _current_route: list[str] = ["/login"]
-_poll_timer: list[threading.Timer | None] = [None]
+_poll_running: list[bool] = [False]
 _page_ref: list[ft.Page | None] = [None]
+_page_refresh_fn: list = [None]  # callable registered by my-leaves / calendar pages
 
 # ── Color palette matching the web version ────────────────────────────────
 INDIGO = "#4f46e5"
@@ -71,50 +71,60 @@ def _color_for(name: str) -> str:
 # ── Background revision polling ───────────────────────────────────────────
 
 def _start_polling(page: ft.Page):
-    """Start the background polling timer (every 5 seconds)."""
+    """Start an async polling task via page.run_task.
+
+    Using page.run_task (async coroutine) instead of page.run_thread
+    because page.run_task runs on the main Flet event loop, which
+    guarantees page.update() works correctly on all platforms including
+    Android/serious_python.
+    """
     _page_ref[0] = page
-    _stop_polling()
+    _poll_running[0] = True
     try:
         _last_revision[0] = api.get_revision()
     except Exception:
         pass
-    _schedule_poll()
+    page.run_task(_poll_async)
 
 
-def _stop_polling():
-    """Cancel any running poll timer."""
-    if _poll_timer[0] is not None:
-        _poll_timer[0].cancel()
-        _poll_timer[0] = None
+async def _poll_async():
+    """Async polling loop: sleep → check revision → refresh current page.
 
+    Uses httpx.AsyncClient for revision checks (httpx is NOT thread-safe,
+    so each coroutine needs its own client).  When a revision change is
+    detected, the registered _page_refresh_fn is run via asyncio.to_thread
+    (sync HTTP fetch + control rebuild), then page.update() is called back
+    on the event loop.
+    """
+    import httpx as _httpx
 
-def _schedule_poll():
-    """Schedule the next poll after 5 seconds."""
-    t = threading.Timer(5.0, _poll_tick)
-    t.daemon = True
-    t.start()
-    _poll_timer[0] = t
-
-
-def _poll_tick():
-    """Check if the backend revision changed; if so, refresh the current page."""
-    try:
-        rev = api.get_revision()
-        if rev != _last_revision[0]:
-            _last_revision[0] = rev
+    async with _httpx.AsyncClient(base_url=api.base, timeout=5) as poll_client:
+        while _poll_running[0]:
+            await asyncio.sleep(10)
             page = _page_ref[0]
-            route = _current_route[0]
-            if page and route in ("/my-leaves", "/calendar"):
-                _navigate(page, route)
-    except Exception:
-        pass
-    _schedule_poll()
+            if not page or not api.user_id:
+                continue
+
+            try:
+                r = await poll_client.get("/api/revision")
+                r.raise_for_status()
+                rev = r.json()["revision"]
+                if rev != _last_revision[0]:
+                    _last_revision[0] = rev
+                    fn = _page_refresh_fn[0]
+                    route = _current_route[0]
+                    if fn and route in ("/my-leaves", "/calendar"):
+                        await asyncio.to_thread(fn)
+                        page.update()
+            except Exception:
+                pass
 
 
 # ── Helper: navigate by clearing page controls ────────────────────────────
 def _navigate(page: ft.Page, route: str):
     """Clear controls and rebuild the page for the given route."""
     _current_route[0] = route
+    _page_refresh_fn[0] = None  # clear until a page re-registers
     page.controls.clear()
     page.overlay.clear()
     page.scroll = None
@@ -265,7 +275,11 @@ def build_contact_page(page: ft.Page):
 def build_my_leaves_page(page: ft.Page):
     leaves_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
-    def _refresh():
+    def _fetch_and_build():
+        """Sync HTTP fetch + rebuild controls. NO page.update().
+
+        Safe to call from a worker thread via asyncio.to_thread().
+        """
         leaves_list.controls.clear()
         try:
             leaves = api.get_my_leaves()
@@ -287,6 +301,9 @@ def build_my_leaves_page(page: ft.Page):
         else:
             for lv in leaves:
                 leaves_list.controls.append(_leave_card(lv))
+
+    def _refresh():
+        _fetch_and_build()
         page.update()
 
     def _leave_card(lv: dict) -> ft.Container:
@@ -326,6 +343,7 @@ def build_my_leaves_page(page: ft.Page):
     def _manual_refresh(_e):
         _refresh()
 
+    _page_refresh_fn[0] = _fetch_and_build  # poll calls this in worker thread
     _refresh()
 
     return ft.Column([
@@ -544,7 +562,8 @@ def build_calendar_page(page: ft.Page):
             dt = datetime(y, m, d)
             return f"{y}年 {m}月 {d}日 (星期{weekdays[dt.weekday()]})"
 
-    def _refresh():
+    def _fetch_and_build():
+        """Sync HTTP fetch + rebuild controls. NO page.update()."""
         title_text.value = _title()
         calendar_content.controls.clear()
         mode = state["mode"]
@@ -557,6 +576,9 @@ def build_calendar_page(page: ft.Page):
                 _build_day_view()
         except Exception as e:
             calendar_content.controls.append(ft.Text(f"載入失敗: {e}", color=RED))
+
+    def _refresh():
+        _fetch_and_build()
         page.update()
 
     def _build_month_view():
@@ -716,6 +738,7 @@ def build_calendar_page(page: ft.Page):
         ft.TextButton("日", on_click=_set_mode("day")),
     ])
 
+    _page_refresh_fn[0] = _fetch_and_build  # poll calls this in worker thread
     _refresh()
 
     return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content],
