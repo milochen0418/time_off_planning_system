@@ -5,5 +5,5 @@ build/
 __pycache__/
 *.py[cod]
 
-# Backup / scratch files
-main_full_app.py
+# Backup / scratch files (only main.py is the real entry point)
+main_*.py
