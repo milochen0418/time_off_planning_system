@@ -4,9 +4,13 @@ API client for the Time-Off Planning System backend.
 
 from __future__ import annotations
 
+import os
+
 import httpx
 
-DEFAULT_BASE = "http://127.0.0.1:8000"
+# Android emulator uses 10.0.2.2 to reach the host machine's localhost.
+# Override with env var API_BASE_URL if needed.
+DEFAULT_BASE = os.environ.get("API_BASE_URL", "http://10.0.2.2:8000")
 
 
 class ApiClient:

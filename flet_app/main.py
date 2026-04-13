@@ -1,23 +1,14 @@
 """
-Time-Off Planning System — Flet Desktop Client
-================================================
-A desktop application mirroring the web UI features:
-  • Login / Contact (no register — users contact admin)
-  • My Leaves — view, add, edit, delete personal leaves
-  • Calendar — month / week / day views of all leaves
-  • Admin — user CRUD + message management
-  • Contact — send a message to the super-admin
-
-Start the API server first (part of the Reflex app):
-    poetry run ./reflex_rerun.sh
-
-Then run this app:
-    poetry run python flet_app/main.py
+Time-Off Planning System — Flet Desktop / Mobile Client
+========================================================
+Uses page.controls (page.add / page.clean) instead of page.views + page.go()
+because the Views-based routing does not render on Flet mobile (APK).
 """
 
 from __future__ import annotations
 
 import calendar as _calendar
+import traceback
 from datetime import datetime, timedelta
 
 import flet as ft
@@ -25,10 +16,9 @@ from httpx import HTTPStatusError
 
 from api_client import ApiClient
 
-# Shared API client (singleton for the app lifetime)
 api = ApiClient()
 
-# Color palette matching the web version
+# ── Color palette matching the web version ────────────────────────────────
 INDIGO = "#4f46e5"
 INDIGO_LIGHT = "#e0e7ff"
 GRAY_50 = "#f9fafb"
@@ -68,6 +58,46 @@ def _color_for(name: str) -> str:
     return LEAVE_COLORS[idx]
 
 
+# ── Helper: navigate by clearing page controls ────────────────────────────
+def _navigate(page: ft.Page, route: str):
+    """Clear controls and rebuild the page for the given route."""
+    page.controls.clear()
+    page.overlay.clear()
+    page.scroll = None
+    page.padding = 0
+    page.bgcolor = GRAY_50
+
+    content: list[ft.Control] = []
+
+    if route == "/my-leaves":
+        if not api.user_id:
+            _navigate(page, "/login")
+            return
+        content = [
+            _navbar(page, "/my-leaves"),
+            ft.Container(build_my_leaves_page(page), padding=20, expand=True),
+        ]
+    elif route == "/calendar":
+        if not api.user_id:
+            _navigate(page, "/login")
+            return
+        content = [
+            _navbar(page, "/calendar"),
+            ft.Container(build_calendar_page(page), padding=20, expand=True),
+        ]
+    elif route == "/admin-login":
+        content = [ft.Container(build_admin_login_page(page), padding=40, expand=True)]
+    elif route == "/admin":
+        content = [ft.Container(build_admin_page(page), padding=20, expand=True)]
+    elif route == "/contact":
+        content = [ft.Container(build_contact_page(page), padding=40, expand=True)]
+    else:
+        content = [ft.Container(build_login_page(page), padding=40, expand=True)]
+
+    page.add(ft.SafeArea(ft.Column(content, expand=True), expand=True))
+    page.update()
+
+
 # ───────────────────────────────────────────────────────────────────────────
 # LOGIN PAGE
 # ───────────────────────────────────────────────────────────────────────────
@@ -81,17 +111,17 @@ def build_login_page(page: ft.Page):
         error_text.value = ""
         try:
             api.login(username_field.value.strip(), password_field.value)
-            page.go("/my-leaves")
+            _navigate(page, "/my-leaves")
         except HTTPStatusError as exc:
             detail = exc.response.json().get("detail", "登入失敗")
             error_text.value = detail
             page.update()
 
     def go_contact(_e):
-        page.go("/contact")
+        _navigate(page, "/contact")
 
     def go_admin_login(_e):
-        page.go("/admin-login")
+        _navigate(page, "/admin-login")
 
     return ft.Column(
         [
@@ -150,7 +180,7 @@ def build_contact_page(page: ft.Page):
         page.update()
 
     def go_back(_e):
-        page.go("/login")
+        _navigate(page, "/login")
 
     return ft.Column(
         [
@@ -179,7 +209,7 @@ def build_my_leaves_page(page: ft.Page):
     end_f = ft.TextField(label="結束時間 (HH:MM)", width=140)
     note_f = ft.TextField(label="備註 (選填)", width=300)
     form_title = ft.Text("新增休假", size=18, weight=ft.FontWeight.BOLD)
-    editing_id: list[int | None] = [None]  # mutable ref
+    editing_id: list[int | None] = [None]
 
     dlg = ft.AlertDialog(modal=True, title=form_title)
 
@@ -197,7 +227,7 @@ def build_my_leaves_page(page: ft.Page):
                         ft.Text("尚未有任何休假記錄", size=16, weight=ft.FontWeight.W_500),
                         ft.Text("點擊上方按鈕來新增您的第一筆預約。", size=13, color=GRAY_500),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    padding=40, alignment=ft.alignment.center,
+                    padding=40, alignment=ft.Alignment(0, 0),
                     border=ft.border.all(2, GRAY_200),
                     border_radius=12,
                 ),
@@ -314,7 +344,7 @@ def build_calendar_page(page: ft.Page):
     now = datetime.now()
     state = {"year": now.year, "month": now.month, "day": now.day, "mode": "month"}
     title_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD)
-    calendar_content = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+    calendar_content = ft.Column(spacing=0)
 
     def _title():
         y, m, d, mode = state["year"], state["month"], state["day"], state["mode"]
@@ -345,15 +375,14 @@ def build_calendar_page(page: ft.Page):
             calendar_content.controls.append(ft.Text(f"載入失敗: {e}", color=RED))
         page.update()
 
-    # ---- Month view ----
     def _build_month_view():
         data = api.get_calendar_month(state["year"], state["month"])
         weekday_headers = ["日", "一", "二", "三", "四", "五", "六"]
         header_row = ft.Row(
             [ft.Container(ft.Text(w, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER, color=GRAY_500),
-                          width=80, alignment=ft.alignment.center)
+                          height=24, alignment=ft.Alignment(0, 0), expand=True)
              for w in weekday_headers],
-            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=0,
         )
         calendar_content.controls.append(header_row)
         for week in data["grid"]:
@@ -361,7 +390,7 @@ def build_calendar_page(page: ft.Page):
             for cell in week:
                 day_num = cell["day"]
                 if day_num == 0:
-                    row_controls.append(ft.Container(width=80, height=70))
+                    row_controls.append(ft.Container(height=70, expand=True))
                     continue
                 items: list[ft.Control] = []
                 day_color = INDIGO if cell.get("is_today") else GRAY_900
@@ -384,14 +413,13 @@ def build_calendar_page(page: ft.Page):
 
                 row_controls.append(ft.Container(
                     ft.Column(items, spacing=1, tight=True),
-                    width=80, height=70, padding=4,
+                    height=70, padding=4, expand=True,
                     border=ft.border.all(1, GRAY_200),
                     bgcolor="white" if not cell.get("is_today") else INDIGO_LIGHT,
                     on_click=_click_day,
                 ))
-            calendar_content.controls.append(ft.Row(row_controls, alignment=ft.MainAxisAlignment.CENTER))
+            calendar_content.controls.append(ft.Row(row_controls, spacing=0))
 
-    # ---- Week view ----
     def _build_week_view():
         data = api.get_calendar_week(state["year"], state["month"], state["day"])
         for col in data["columns"]:
@@ -424,7 +452,6 @@ def build_calendar_page(page: ft.Page):
                 margin=ft.margin.only(bottom=6),
             ))
 
-    # ---- Day view ----
     def _build_day_view():
         data = api.get_calendar_day(state["year"], state["month"], state["day"])
         for hr in data["hours"]:
@@ -449,7 +476,6 @@ def build_calendar_page(page: ft.Page):
                 height=50, border=ft.border.only(bottom=ft.BorderSide(1, GRAY_200)),
             ))
 
-    # Navigation
     def _prev(_e):
         y, m, d, mode = state["year"], state["month"], state["day"], state["mode"]
         if mode == "month":
@@ -489,25 +515,23 @@ def build_calendar_page(page: ft.Page):
             _refresh()
         return handler
 
-    mode_selector = ft.Row([
+    nav_row1 = ft.Row([
+        ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
+        title_text,
+        ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
+        ft.Container(expand=True),
+        ft.OutlinedButton("今天", on_click=_today),
+    ])
+    nav_row2 = ft.Row([
         ft.TextButton("月", on_click=_set_mode("month")),
         ft.TextButton("週", on_click=_set_mode("week")),
         ft.TextButton("日", on_click=_set_mode("day")),
     ])
 
-    nav_row = ft.Row([
-        ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
-        title_text,
-        ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
-        ft.Container(width=16),
-        ft.OutlinedButton("今天", on_click=_today),
-        ft.Container(expand=True),
-        mode_selector,
-    ])
-
     _refresh()
 
-    return ft.Column([nav_row, ft.Divider(height=1), calendar_content], expand=True)
+    return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content],
+                     scroll=ft.ScrollMode.AUTO, expand=True)
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -523,13 +547,13 @@ def build_admin_login_page(page: ft.Page):
         error_text.value = ""
         try:
             api.admin_login(usr.value.strip(), pwd.value)
-            page.go("/admin")
+            _navigate(page, "/admin")
         except HTTPStatusError as exc:
             error_text.value = exc.response.json().get("detail", "登入失敗")
             page.update()
 
     def go_back(_e):
-        page.go("/login")
+        _navigate(page, "/login")
 
     return ft.Column(
         [
@@ -553,7 +577,7 @@ def build_admin_login_page(page: ft.Page):
 
 def build_admin_page(page: ft.Page):
     if not api.is_admin:
-        page.go("/admin-login")
+        _navigate(page, "/admin-login")
         return ft.Container()
 
     users_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
@@ -679,7 +703,6 @@ def build_admin_page(page: ft.Page):
     ]
     page.overlay.append(dlg)
 
-    # Tabs
     tabs = ft.Tabs(
         selected_index=0,
         tabs=[
@@ -708,7 +731,7 @@ def build_admin_page(page: ft.Page):
 
     def admin_logout(_e):
         api.is_admin = False
-        page.go("/login")
+        _navigate(page, "/login")
 
     _refresh_users()
     _refresh_messages()
@@ -736,100 +759,45 @@ def _navbar(page: ft.Page, active: str) -> ft.Container:
             style=ft.ButtonStyle(
                 color=INDIGO if is_active else GRAY_500,
             ),
-            on_click=lambda _e: page.go(route),
+            on_click=lambda _e: _navigate(page, route),
         )
 
     def logout(_e):
         api.logout()
-        page.go("/login")
+        _navigate(page, "/login")
 
     return ft.Container(
-        ft.Row([
-            ft.Icon(ft.Icons.CALENDAR_MONTH, color=INDIGO),
-            ft.Text("預約休假管理系統", weight=ft.FontWeight.BOLD, size=16),
-            ft.Container(width=20),
-            nav_btn("我的休假", "/my-leaves"),
-            nav_btn("共用日曆", "/calendar"),
-            ft.Container(expand=True),
-            ft.Text(f"你好, {api.display_name}", size=13, color=GRAY_700),
-            ft.OutlinedButton("登出", on_click=logout),
-        ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-        padding=ft.padding.symmetric(horizontal=16, vertical=8),
+        ft.Column([
+            # Row 1: logo + greeting + logout
+            ft.Row([
+                ft.Icon(ft.Icons.CALENDAR_MONTH, color=INDIGO, size=20),
+                ft.Text("預約休假管理系統", weight=ft.FontWeight.BOLD, size=14),
+                ft.Container(expand=True),
+                ft.Text(f"{api.display_name}", size=12, color=GRAY_700),
+                ft.TextButton("登出", on_click=logout,
+                              style=ft.ButtonStyle(color=GRAY_500, padding=0)),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            # Row 2: nav tabs
+            ft.Row([
+                nav_btn("我的休假", "/my-leaves"),
+                nav_btn("共用日曆", "/calendar"),
+            ]),
+        ], spacing=0),
+        padding=ft.padding.symmetric(horizontal=12, vertical=4),
         bgcolor="white",
         border=ft.border.only(bottom=ft.BorderSide(1, GRAY_200)),
     )
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# MAIN APP
+# MAIN ENTRY POINT
 # ───────────────────────────────────────────────────────────────────────────
 
 def main(page: ft.Page):
     page.title = "預約休假管理系統"
-    page.window.width = 900
-    page.window.height = 700
     page.bgcolor = GRAY_50
     page.padding = 0
-
-    def route_change(_e):
-        page.overlay.clear()
-        page.views.clear()
-        route = page.route
-
-        if route == "/my-leaves":
-            if not api.user_id:
-                page.go("/login")
-                return
-            page.views.append(ft.View(
-                "/my-leaves", [
-                    _navbar(page, "/my-leaves"),
-                    ft.Container(build_my_leaves_page(page), padding=20, expand=True),
-                ],
-                padding=0,
-            ))
-        elif route == "/calendar":
-            if not api.user_id:
-                page.go("/login")
-                return
-            page.views.append(ft.View(
-                "/calendar", [
-                    _navbar(page, "/calendar"),
-                    ft.Container(build_calendar_page(page), padding=20, expand=True),
-                ],
-                padding=0,
-            ))
-        elif route == "/admin-login":
-            page.views.append(ft.View(
-                "/admin-login", [
-                    ft.Container(build_admin_login_page(page), padding=40, expand=True),
-                ],
-            ))
-        elif route == "/admin":
-            page.views.append(ft.View(
-                "/admin", [
-                    ft.Container(build_admin_page(page), padding=20, expand=True),
-                ],
-                padding=0,
-            ))
-        elif route == "/contact":
-            page.views.append(ft.View(
-                "/contact", [
-                    ft.Container(build_contact_page(page), padding=40, expand=True),
-                ],
-            ))
-        else:
-            # Default: login
-            page.views.append(ft.View(
-                "/login", [
-                    ft.Container(build_login_page(page), padding=40, expand=True),
-                ],
-            ))
-
-        page.update()
-
-    page.on_route_change = route_change
-    page.go("/login")
+    _navigate(page, "/login")
 
 
-if __name__ == "__main__":
-    ft.app(target=main)
+ft.app(target=main)
