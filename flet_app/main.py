@@ -67,31 +67,34 @@ def _navigate(page: ft.Page, route: str):
     page.padding = 0
     page.bgcolor = GRAY_50
 
+    content: list[ft.Control] = []
+
     if route == "/my-leaves":
         if not api.user_id:
             _navigate(page, "/login")
             return
-        page.add(
+        content = [
             _navbar(page, "/my-leaves"),
             ft.Container(build_my_leaves_page(page), padding=20, expand=True),
-        )
+        ]
     elif route == "/calendar":
         if not api.user_id:
             _navigate(page, "/login")
             return
-        page.add(
+        content = [
             _navbar(page, "/calendar"),
             ft.Container(build_calendar_page(page), padding=20, expand=True),
-        )
+        ]
     elif route == "/admin-login":
-        page.add(ft.Container(build_admin_login_page(page), padding=40, expand=True))
+        content = [ft.Container(build_admin_login_page(page), padding=40, expand=True)]
     elif route == "/admin":
-        page.add(ft.Container(build_admin_page(page), padding=20, expand=True))
+        content = [ft.Container(build_admin_page(page), padding=20, expand=True)]
     elif route == "/contact":
-        page.add(ft.Container(build_contact_page(page), padding=40, expand=True))
+        content = [ft.Container(build_contact_page(page), padding=40, expand=True)]
     else:
-        page.add(ft.Container(build_login_page(page), padding=40, expand=True))
+        content = [ft.Container(build_login_page(page), padding=40, expand=True)]
 
+    page.add(ft.SafeArea(ft.Column(content, expand=True), expand=True))
     page.update()
 
 
@@ -766,17 +769,23 @@ def _navbar(page: ft.Page, active: str) -> ft.Container:
         _navigate(page, "/login")
 
     return ft.Container(
-        ft.Row([
-            ft.Icon(ft.Icons.CALENDAR_MONTH, color=INDIGO),
-            ft.Text("預約休假管理系統", weight=ft.FontWeight.BOLD, size=16),
-            ft.Container(width=20),
-            nav_btn("我的休假", "/my-leaves"),
-            nav_btn("共用日曆", "/calendar"),
-            ft.Container(expand=True),
-            ft.Text(f"你好, {api.display_name}", size=13, color=GRAY_700),
-            ft.OutlinedButton("登出", on_click=logout),
-        ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-        padding=ft.padding.symmetric(horizontal=16, vertical=8),
+        ft.Column([
+            # Row 1: logo + greeting + logout
+            ft.Row([
+                ft.Icon(ft.Icons.CALENDAR_MONTH, color=INDIGO, size=20),
+                ft.Text("預約休假管理系統", weight=ft.FontWeight.BOLD, size=14),
+                ft.Container(expand=True),
+                ft.Text(f"{api.display_name}", size=12, color=GRAY_700),
+                ft.TextButton("登出", on_click=logout,
+                              style=ft.ButtonStyle(color=GRAY_500, padding=0)),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            # Row 2: nav tabs
+            ft.Row([
+                nav_btn("我的休假", "/my-leaves"),
+                nav_btn("共用日曆", "/calendar"),
+            ]),
+        ], spacing=0),
+        padding=ft.padding.symmetric(horizontal=12, vertical=4),
         bgcolor="white",
         border=ft.border.only(bottom=ft.BorderSide(1, GRAY_200)),
     )
