@@ -88,6 +88,12 @@ class MessageCreate(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@router.get("/revision")
+def get_revision():
+    """Lightweight endpoint returning the current data-store revision number."""
+    return {"revision": store.revision}
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(req: LoginRequest):
     user = next(

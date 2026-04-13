@@ -25,6 +25,14 @@ class ApiClient:
         self.display_name: str = ""
         self.is_admin: bool = False
 
+    # -- Revision ------------------------------------------------------------
+
+    def get_revision(self) -> int:
+        """Return the current data-store revision number (lightweight)."""
+        r = self._client.get("/api/revision")
+        r.raise_for_status()
+        return r.json()["revision"]
+
     # -- Auth ----------------------------------------------------------------
 
     def login(self, username: str, password: str) -> dict:
