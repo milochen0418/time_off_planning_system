@@ -8,6 +8,7 @@ because the Views-based routing does not render on Flet mobile (APK).
 from __future__ import annotations
 
 import calendar as _calendar
+import threading
 import traceback
 from datetime import datetime, timedelta
 
@@ -20,6 +21,12 @@ api = ApiClient()
 
 # Module-level state for leave form editing (None = add new, int = edit existing)
 _editing_leave_id: list[int | None] = [None]
+
+# Background polling state
+_last_revision: list[int] = [0]
+_current_route: list[str] = ["/login"]
+_poll_timer: list[threading.Timer | None] = [None]
+_page_ref: list[ft.Page | None] = [None]
 
 # ── Color palette matching the web version ────────────────────────────────
 INDIGO = "#4f46e5"
@@ -61,9 +68,53 @@ def _color_for(name: str) -> str:
     return LEAVE_COLORS[idx]
 
 
+# ── Background revision polling ───────────────────────────────────────────
+
+def _start_polling(page: ft.Page):
+    """Start the background polling timer (every 5 seconds)."""
+    _page_ref[0] = page
+    _stop_polling()
+    try:
+        _last_revision[0] = api.get_revision()
+    except Exception:
+        pass
+    _schedule_poll()
+
+
+def _stop_polling():
+    """Cancel any running poll timer."""
+    if _poll_timer[0] is not None:
+        _poll_timer[0].cancel()
+        _poll_timer[0] = None
+
+
+def _schedule_poll():
+    """Schedule the next poll after 5 seconds."""
+    t = threading.Timer(5.0, _poll_tick)
+    t.daemon = True
+    t.start()
+    _poll_timer[0] = t
+
+
+def _poll_tick():
+    """Check if the backend revision changed; if so, refresh the current page."""
+    try:
+        rev = api.get_revision()
+        if rev != _last_revision[0]:
+            _last_revision[0] = rev
+            page = _page_ref[0]
+            route = _current_route[0]
+            if page and route in ("/my-leaves", "/calendar"):
+                _navigate(page, route)
+    except Exception:
+        pass
+    _schedule_poll()
+
+
 # ── Helper: navigate by clearing page controls ────────────────────────────
 def _navigate(page: ft.Page, route: str):
     """Clear controls and rebuild the page for the given route."""
+    _current_route[0] = route
     page.controls.clear()
     page.overlay.clear()
     page.scroll = None
@@ -272,6 +323,9 @@ def build_my_leaves_page(page: ft.Page):
         _editing_leave_id[0] = None
         _navigate(page, "/leave-form")
 
+    def _manual_refresh(_e):
+        _refresh()
+
     _refresh()
 
     return ft.Column([
@@ -280,6 +334,7 @@ def build_my_leaves_page(page: ft.Page):
                 ft.Text("我的休假清單", size=22, weight=ft.FontWeight.BOLD),
                 ft.Text("管理您的個人預約記錄。", size=13, color=GRAY_500),
             ], expand=True),
+            ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip="重新整理", on_click=_manual_refresh),
             ft.ElevatedButton("新增休假", icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add),
         ]),
         ft.Divider(height=1),
@@ -644,11 +699,15 @@ def build_calendar_page(page: ft.Page):
             _refresh()
         return handler
 
+    def _manual_refresh(_e):
+        _refresh()
+
     nav_row1 = ft.Row([
         ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
         title_text,
         ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
         ft.Container(expand=True),
+        ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip="重新整理", on_click=_manual_refresh),
         ft.OutlinedButton("今天", on_click=_today),
     ])
     nav_row2 = ft.Row([
@@ -926,6 +985,7 @@ def main(page: ft.Page):
     page.title = "預約休假管理系統"
     page.bgcolor = GRAY_50
     page.padding = 0
+    _start_polling(page)
     _navigate(page, "/login")
 
 
