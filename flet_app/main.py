@@ -18,6 +18,9 @@ from api_client import ApiClient
 
 api = ApiClient()
 
+# Module-level state for leave form editing (None = add new, int = edit existing)
+_editing_leave_id: list[int | None] = [None]
+
 # ── Color palette matching the web version ────────────────────────────────
 INDIGO = "#4f46e5"
 INDIGO_LIGHT = "#e0e7ff"
@@ -76,6 +79,14 @@ def _navigate(page: ft.Page, route: str):
         content = [
             _navbar(page, "/my-leaves"),
             ft.Container(build_my_leaves_page(page), padding=20, expand=True),
+        ]
+    elif route == "/leave-form":
+        if not api.user_id:
+            _navigate(page, "/login")
+            return
+        content = [
+            _navbar(page, "/my-leaves"),
+            ft.Container(build_leave_form_page(page), padding=20, expand=True),
         ]
     elif route == "/calendar":
         if not api.user_id:
@@ -202,16 +213,6 @@ def build_contact_page(page: ft.Page):
 
 def build_my_leaves_page(page: ft.Page):
     leaves_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
-    form_error = ft.Text("", color=RED, size=13)
-
-    date_f = ft.TextField(label="日期 (YYYY-MM-DD)", width=300)
-    start_f = ft.TextField(label="開始時間 (HH:MM)", width=140)
-    end_f = ft.TextField(label="結束時間 (HH:MM)", width=140)
-    note_f = ft.TextField(label="備註 (選填)", width=300)
-    form_title = ft.Text("新增休假", size=18, weight=ft.FontWeight.BOLD)
-    editing_id: list[int | None] = [None]
-
-    dlg = ft.AlertDialog(modal=True, title=form_title)
 
     def _refresh():
         leaves_list.controls.clear()
@@ -239,7 +240,8 @@ def build_my_leaves_page(page: ft.Page):
 
     def _leave_card(lv: dict) -> ft.Container:
         def edit(_e, lid=lv["id"]):
-            _open_edit(lid)
+            _editing_leave_id[0] = lid
+            _navigate(page, "/leave-form")
 
         def delete(_e, lid=lv["id"]):
             try:
@@ -267,59 +269,8 @@ def build_my_leaves_page(page: ft.Page):
         )
 
     def _open_add(_e):
-        editing_id[0] = None
-        form_title.value = "新增休假"
-        date_f.value = start_f.value = end_f.value = note_f.value = ""
-        form_error.value = ""
-        dlg.open = True
-        page.update()
-
-    def _open_edit(lid: int):
-        try:
-            leaves = api.get_my_leaves()
-            lv = next((l for l in leaves if l["id"] == lid), None)
-        except Exception:
-            return
-        if not lv:
-            return
-        editing_id[0] = lid
-        form_title.value = "編輯休假"
-        date_f.value = lv["leave_date"]
-        start_f.value = lv["start_time"]
-        end_f.value = lv["end_time"]
-        note_f.value = lv.get("note", "")
-        form_error.value = ""
-        dlg.open = True
-        page.update()
-
-    def _save(_e):
-        form_error.value = ""
-        try:
-            if editing_id[0] is None:
-                api.create_leave(date_f.value.strip(), start_f.value.strip(), end_f.value.strip(), note_f.value.strip())
-            else:
-                api.update_leave(editing_id[0], date_f.value.strip(), start_f.value.strip(), end_f.value.strip(), note_f.value.strip())
-            dlg.open = False
-            _refresh()
-        except HTTPStatusError as exc:
-            form_error.value = exc.response.json().get("detail", "儲存失敗")
-            page.update()
-
-    def _cancel(_e):
-        dlg.open = False
-        page.update()
-
-    dlg.content = ft.Column([
-        date_f,
-        ft.Row([start_f, end_f]),
-        note_f,
-        form_error,
-    ], tight=True, width=340)
-    dlg.actions = [
-        ft.TextButton("取消", on_click=_cancel),
-        ft.ElevatedButton("儲存", bgcolor=INDIGO, color="white", on_click=_save),
-    ]
-    page.overlay.append(dlg)
+        _editing_leave_id[0] = None
+        _navigate(page, "/leave-form")
 
     _refresh()
 
@@ -334,6 +285,184 @@ def build_my_leaves_page(page: ft.Page):
         ft.Divider(height=1),
         leaves_list,
     ], expand=True)
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# LEAVE FORM PAGE (full page, no dialog — so DatePicker / TimePicker work)
+# ───────────────────────────────────────────────────────────────────────────
+
+def build_leave_form_page(page: ft.Page):
+    editing_id = _editing_leave_id[0]
+    is_edit = editing_id is not None
+    form_error = ft.Text("", color=RED, size=13)
+    debug_log = ft.Text("", color=GRAY_500, size=11)  # debug log visible on screen
+
+    def _log(msg: str):
+        """Append debug message visible on screen (serious_python has no logcat)."""
+        debug_log.value = msg
+        try:
+            page.update()
+        except Exception:
+            pass
+
+    # -- Resolve defaults --
+    now = datetime.now()
+    init_date = now.strftime("%Y-%m-%d")
+    init_start = "09:00"
+    init_end = "18:00"
+    init_note = ""
+
+    if is_edit:
+        try:
+            leaves = api.get_my_leaves()
+            lv = next((l for l in leaves if l["id"] == editing_id), None)
+            if lv:
+                init_date = lv["leave_date"]
+                init_start = lv["start_time"]
+                init_end = lv["end_time"]
+                init_note = lv.get("note", "")
+        except Exception:
+            pass
+
+    # -- Display fields: use Text in styled Containers (TextField steals tap) --
+    date_text = ft.Text(init_date, size=16)
+    start_text = ft.Text(init_start, size=16)
+    end_text = ft.Text(init_end, size=16)
+    note_f = ft.TextField(label="備註 (選填)", value=init_note)
+
+    def _make_picker_field(icon: str, label: str, value_text: ft.Text, on_tap) -> ft.Container:
+        return ft.Container(
+            content=ft.Row([
+                ft.Icon(icon, color=INDIGO, size=20),
+                ft.Column([
+                    ft.Text(label, size=11, color=GRAY_500),
+                    value_text,
+                ], spacing=2, expand=True),
+                ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=GRAY_500),
+            ]),
+            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            border=ft.border.all(1, GRAY_200),
+            border_radius=8,
+            bgcolor="white",
+            on_click=on_tap,
+            ink=True,
+        )
+
+    # -- Native pickers --
+    def _parse_date(s: str) -> datetime:
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            return now
+
+    date_picker = ft.DatePicker(
+        first_date=datetime(2020, 1, 1),
+        last_date=datetime(2030, 12, 31),
+        value=_parse_date(init_date),
+    )
+    start_time_picker = ft.TimePicker()
+    end_time_picker = ft.TimePicker()
+
+    def _on_date_change(e):
+        _log(f"DatePicker on_change fired, value={date_picker.value}")
+        if date_picker.value:
+            date_text.value = date_picker.value.strftime("%Y-%m-%d")
+            page.update()
+
+    def _on_start_change(e):
+        _log(f"StartTimePicker on_change fired, value={start_time_picker.value}")
+        if start_time_picker.value:
+            t = start_time_picker.value
+            start_text.value = f"{t.hour:02d}:{t.minute:02d}"
+            page.update()
+
+    def _on_end_change(e):
+        _log(f"EndTimePicker on_change fired, value={end_time_picker.value}")
+        if end_time_picker.value:
+            t = end_time_picker.value
+            end_text.value = f"{t.hour:02d}:{t.minute:02d}"
+            page.update()
+
+    date_picker.on_change = _on_date_change
+    start_time_picker.on_change = _on_start_change
+    end_time_picker.on_change = _on_end_change
+
+    # Add pickers to overlay so they can be opened
+    page.overlay.extend([date_picker, start_time_picker, end_time_picker])
+
+    def _open_picker(picker, label):
+        _log(f"Opening {label}")
+        try:
+            picker.open = True
+            page.update()
+            _log(f"{label} opened OK")
+        except Exception as ex:
+            _log(f"{label} ERROR: {ex}")
+
+    def _tap_date(_e):
+        if date_text.value:
+            try:
+                date_picker.value = datetime.strptime(date_text.value, "%Y-%m-%d")
+            except ValueError:
+                pass
+        _open_picker(date_picker, "date_picker")
+
+    def _tap_start(_e):
+        _open_picker(start_time_picker, "start_time_picker")
+
+    def _tap_end(_e):
+        _open_picker(end_time_picker, "end_time_picker")
+
+    # -- Save / Cancel --
+    def _save(_e):
+        form_error.value = ""
+        d = (date_text.value or "").strip()
+        s = (start_text.value or "").strip()
+        en = (end_text.value or "").strip()
+        n = note_f.value.strip()
+        try:
+            if is_edit:
+                api.update_leave(editing_id, d, s, en, n)
+            else:
+                api.create_leave(d, s, en, n)
+            _navigate(page, "/my-leaves")
+        except HTTPStatusError as exc:
+            form_error.value = exc.response.json().get("detail", "儲存失敗")
+            page.update()
+
+    def _cancel(_e):
+        _navigate(page, "/my-leaves")
+
+    title = "編輯休假" if is_edit else "新增休假"
+
+    # Build tappable picker fields
+    date_row = _make_picker_field(ft.Icons.CALENDAR_MONTH, "日期", date_text, _tap_date)
+    start_row = _make_picker_field(ft.Icons.ACCESS_TIME, "開始時間", start_text, _tap_start)
+    end_row = _make_picker_field(ft.Icons.ACCESS_TIME, "結束時間", end_text, _tap_end)
+
+    return ft.Column([
+        ft.Row([
+            ft.IconButton(ft.Icons.ARROW_BACK, on_click=_cancel),
+            ft.Text(title, size=22, weight=ft.FontWeight.BOLD),
+        ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        ft.Divider(height=1),
+        ft.Container(height=8),
+        date_row,
+        ft.Container(height=8),
+        start_row,
+        ft.Container(height=8),
+        end_row,
+        ft.Container(height=12),
+        note_f,
+        form_error,
+        ft.Container(height=16),
+        ft.Row([
+            ft.OutlinedButton("取消", on_click=_cancel),
+            ft.ElevatedButton("儲存", bgcolor=INDIGO, color="white", on_click=_save),
+        ], alignment=ft.MainAxisAlignment.END),
+        ft.Container(height=8),
+        debug_log,
+    ], scroll=ft.ScrollMode.AUTO, expand=True)
 
 
 # ───────────────────────────────────────────────────────────────────────────
