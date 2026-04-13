@@ -1,6 +1,6 @@
 # Flet App — 環境安裝與啟動指南
 
-本文件說明如何從零開始安裝所有必要工具，並在 **Android 模擬器** 上執行此 Flet 行動應用程式。
+本文件說明如何從零開始安裝所有必要工具，並在 **Android 模擬器** 或 **iOS 模擬器** 上執行此 Flet 行動應用程式。
 
 > 以下步驟以 **macOS (Apple Silicon)** 為主。
 
@@ -17,6 +17,7 @@
 7. [設定環境變數](#7-設定環境變數)
 8. [接受 Android SDK Licenses](#8-接受-android-sdk-licenses)
 9. [建立 Android 模擬器 (AVD)](#9-建立-android-模擬器-avd)
+9.5. [iOS 模擬器設定](#95-ios-模擬器設定)
 10. [驗證環境 — flutter doctor](#10-驗證環境--flutter-doctor)
 11. [安裝 Python 依賴](#11-安裝-python-依賴)
 12. [啟動應用程式](#12-啟動應用程式)
@@ -37,6 +38,8 @@
 | JDK | 17 |
 | Android SDK | 36 (含 Build Tools) |
 | Homebrew | 最新版 |
+| Xcode | 16+ (僅 iOS 模擬器需要) |
+| CocoaPods | 1.x (僅 iOS 模擬器需要) |
 
 ---
 
@@ -200,6 +203,62 @@ avdmanager list avd
 
 ---
 
+## 9.5. iOS 模擬器設定
+
+如果需要在 iOS 模擬器上執行，還需要以下額外設定。
+
+### 9.5.1 安裝 Xcode
+
+從 Mac App Store 安裝 Xcode 16+，或使用已安裝的版本。
+
+確認 Xcode command line tools：
+
+```bash
+xcode-select --install   # 如果尚未安裝
+xcodebuild -version      # 應顯示 Xcode 16.x
+```
+
+### 9.5.2 安裝 CocoaPods
+
+```bash
+brew install cocoapods
+```
+
+確認：
+
+```bash
+pod --version   # 應顯示 1.x
+```
+
+### 9.5.3 下載 iOS Simulator Runtime
+
+```bash
+xcodebuild -downloadPlatform iOS
+```
+
+> 下載約 8–9 GB，需要一些時間。完成後可用以下指令確認：
+
+```bash
+xcrun simctl list runtimes
+# 應顯示 iOS 18.x
+```
+
+### 9.5.4 建立 iOS 模擬器
+
+Xcode 通常會自帶預設模擬器。確認可用的模擬器：
+
+```bash
+xcrun simctl list devices available | grep iPhone
+```
+
+如果沒有，手動建立一台：
+
+```bash
+xcrun simctl create "iPhone 16" "com.apple.CoreSimulator.SimDeviceType.iPhone-16" "com.apple.CoreSimulator.SimRuntime.iOS-18-6"
+```
+
+---
+
 ## 10. 驗證環境 — flutter doctor
 
 ```bash
@@ -268,6 +327,37 @@ poetry run flet run flet_app/main.py --android
 
 > Flet 會自動打包並安裝 APK 到模擬器上。首次執行會比較慢（需要編譯 Flutter 專案）。
 
+### 終端 C（替代）— 啟動 iOS 模擬器 + Flet App
+
+**步驟 1：啟動 iOS 模擬器**
+
+```bash
+open -a Simulator
+```
+
+或指定特定模擬器：
+
+```bash
+xcrun simctl boot "iPhone 16"
+open -a Simulator
+```
+
+等待模擬器完全開機。可用以下指令確認裝置就緒：
+
+```bash
+xcrun simctl list devices booted
+# 應顯示一台 Booted 的 iPhone
+```
+
+**步驟 2：執行 Flet App（在 iOS 模擬器上）**
+
+```bash
+cd /path/to/time_off_planning_system
+poetry run flet run flet_app/main.py --ios
+```
+
+> Flet 會自動編譯並安裝到 iOS 模擬器上。首次執行需要較長時間（CocoaPods 安裝 + Flutter 編譯）。
+
 ### 其他啟動模式
 
 **桌面模式（不需要模擬器）：**
@@ -295,8 +385,11 @@ API_BASE_URL="http://127.0.0.1:8000" poetry run flet run flet_app/main.py --web 
 | 執行環境 | API Base URL | 說明 |
 |----------|-------------|------|
 | Android 模擬器 | `http://10.0.2.2:8000` | `10.0.2.2` 是 Android 模擬器存取 host 的特殊 IP |
+| iOS 模擬器 | `http://127.0.0.1:8000` | iOS 模擬器與 host 共用網路，直接連 localhost |
 | 桌面 / Web | `http://127.0.0.1:8000` | 直接連本機 |
 | 實體手機（同 WiFi） | `http://<Mac 的 IP>:8000` | 例如 `http://192.168.1.100:8000` |
+
+> **注意**：`api_client.py` 會自動偵測平台並選擇正確的 Base URL。Android 環境偵測到 `ANDROID_ROOT` 時使用 `10.0.2.2`，其餘平台預設 `127.0.0.1`。也可透過環境變數 `API_BASE_URL` 手動覆蓋。
 
 可透過環境變數 `API_BASE_URL` 覆蓋，例如：
 

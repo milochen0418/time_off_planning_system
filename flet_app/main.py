@@ -1011,6 +1011,11 @@ def main(page: ft.Page):
     page.title = "預約休假管理系統"
     page.bgcolor = GRAY_50
     page.padding = 0
+    # On Android emulator the default 10.0.2.2 is correct.
+    # On iOS simulator or desktop, use 127.0.0.1.
+    if page.platform in (ft.PagePlatform.IOS, ft.PagePlatform.MACOS):
+        if "10.0.2.2" in api.base:
+            api.reconfigure("http://127.0.0.1:8000")
     _start_polling(page)
     _navigate(page, "/login")
 

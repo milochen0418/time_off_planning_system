@@ -8,9 +8,25 @@ import os
 
 import httpx
 
-# Android emulator uses 10.0.2.2 to reach the host machine's localhost.
-# Override with env var API_BASE_URL if needed.
-DEFAULT_BASE = os.environ.get("API_BASE_URL", "http://10.0.2.2:8000")
+
+def _default_base() -> str:
+    """Pick the right default base URL for the current platform.
+
+    - Android emulator: ``10.0.2.2`` to reach the host's localhost.
+    - iOS simulator / desktop / web: ``127.0.0.1`` works directly.
+    - Override with env var ``API_BASE_URL`` for any platform.
+    """
+    env = os.environ.get("API_BASE_URL")
+    if env:
+        return env
+    # When packaged with serious_python for Android, sys.platform is 'linux'
+    # and the ANDROID_BOOTLOGO env var (or others) are present.
+    if os.environ.get("ANDROID_BOOTLOGO") or os.environ.get("ANDROID_ROOT"):
+        return "http://10.0.2.2:8000"
+    return "http://127.0.0.1:8000"
+
+
+DEFAULT_BASE = _default_base()
 
 
 class ApiClient:
@@ -24,6 +40,11 @@ class ApiClient:
         self.username: str = ""
         self.display_name: str = ""
         self.is_admin: bool = False
+
+    def reconfigure(self, base_url: str) -> None:
+        """Switch to a different backend URL (e.g. after platform detection)."""
+        self.base = base_url.rstrip("/")
+        self._client = httpx.Client(base_url=self.base, timeout=10)
 
     # -- Revision ------------------------------------------------------------
 
