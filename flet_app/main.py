@@ -100,7 +100,7 @@ async def _poll_async():
 
     async with _httpx.AsyncClient(base_url=api.base, timeout=5) as poll_client:
         while _poll_running[0]:
-            await asyncio.sleep(10)
+            await asyncio.sleep(3)
             page = _page_ref[0]
             if not page or not api.user_id:
                 continue
