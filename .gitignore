@@ -32,3 +32,9 @@ docker/zones/db.reflex-ddns.com
 # Playwright / Test Artifacts
 testcases/**/output/
 .playwright-mcp/
+
+# Screenshots in project root
+/*.png
+
+# Ad-hoc analysis scripts
+/analyze_*.py
