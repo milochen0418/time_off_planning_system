@@ -45,10 +45,27 @@ poetry run ./reflex_rerun.sh
 
 ### 3. 啟動 Flet 桌面/手機程式 (另一個終端)
 
+**桌面模式：**
+
 ```bash
 cd flet_app
 poetry run python main.py
 ```
+
+**Android 模擬器：**
+
+```bash
+poetry run flet run flet_app/main.py --android
+```
+
+**iOS 模擬器：**
+
+```bash
+open -a Simulator
+poetry run flet run flet_app/main.py --ios
+```
+
+> iOS 模擬器需要 Xcode 16+ 和 CocoaPods。詳見 [HOW_TO_RUN.md](HOW_TO_RUN.md)。
 
 ## 預設帳號
 
