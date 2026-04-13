@@ -439,7 +439,10 @@ def build_leave_form_page(page: ft.Page):
     def _on_date_change(e):
         _log(f"DatePicker on_change fired, value={date_picker.value}")
         if date_picker.value:
-            date_text.value = date_picker.value.strftime("%Y-%m-%d")
+            # DatePicker returns UTC datetime; convert to local date to avoid
+            # the "off-by-one-day" bug in UTC+ timezones.
+            local_dt = date_picker.value.astimezone()
+            date_text.value = local_dt.strftime("%Y-%m-%d")
             page.update()
 
     def _on_start_change(e):
