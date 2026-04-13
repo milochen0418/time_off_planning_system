@@ -1,0 +1,9 @@
+# Flet build artifacts (APK, Flutter intermediates, bundled site-packages)
+build/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Backup / scratch files
+main_full_app.py
