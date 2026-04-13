@@ -227,7 +227,7 @@ def build_my_leaves_page(page: ft.Page):
                         ft.Text("尚未有任何休假記錄", size=16, weight=ft.FontWeight.W_500),
                         ft.Text("點擊上方按鈕來新增您的第一筆預約。", size=13, color=GRAY_500),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    padding=40, alignment=ft.alignment.center,
+                    padding=40, alignment=ft.Alignment(0, 0),
                     border=ft.border.all(2, GRAY_200),
                     border_radius=12,
                 ),
@@ -380,7 +380,7 @@ def build_calendar_page(page: ft.Page):
         weekday_headers = ["日", "一", "二", "三", "四", "五", "六"]
         header_row = ft.Row(
             [ft.Container(ft.Text(w, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER, color=GRAY_500),
-                          width=80, alignment=ft.alignment.center)
+                          width=80, alignment=ft.Alignment(0, 0))
              for w in weekday_headers],
             alignment=ft.MainAxisAlignment.CENTER,
         )
@@ -515,25 +515,22 @@ def build_calendar_page(page: ft.Page):
             _refresh()
         return handler
 
-    mode_selector = ft.Row([
+    nav_row1 = ft.Row([
+        ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
+        title_text,
+        ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
+        ft.Container(expand=True),
+        ft.OutlinedButton("今天", on_click=_today),
+    ])
+    nav_row2 = ft.Row([
         ft.TextButton("月", on_click=_set_mode("month")),
         ft.TextButton("週", on_click=_set_mode("week")),
         ft.TextButton("日", on_click=_set_mode("day")),
     ])
 
-    nav_row = ft.Row([
-        ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
-        title_text,
-        ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
-        ft.Container(width=16),
-        ft.OutlinedButton("今天", on_click=_today),
-        ft.Container(expand=True),
-        mode_selector,
-    ])
-
     _refresh()
 
-    return ft.Column([nav_row, ft.Divider(height=1), calendar_content], expand=True)
+    return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content], expand=True)
 
 
 # ───────────────────────────────────────────────────────────────────────────
