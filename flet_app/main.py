@@ -122,6 +122,20 @@ async def _poll_async():
 
 
 # ── Helper: navigate by clearing page controls ────────────────────────────
+def _nav(page: ft.Page, route: str):
+    """Thread-safe navigate — schedules _navigate on the UI event loop.
+
+    On mobile (iOS / Android) event-handler callbacks run on a worker thread.
+    Calling _navigate directly from those callbacks silently fails because
+    page.update() does not flush native views from a worker thread.
+    This wrapper uses page.run_task() so the rebuild always runs on the
+    correct event loop.
+    """
+    async def _go():
+        _navigate(page, route)
+    page.run_task(_go)
+
+
 def _navigate(page: ft.Page, route: str):
     """Clear controls and rebuild the page for the given route."""
     _current_route[0] = route
@@ -212,17 +226,20 @@ def build_login_page(page: ft.Page):
         error_text.value = ""
         try:
             api.login(username_field.value.strip(), password_field.value)
-            _navigate(page, "/my-leaves")
+            _nav(page, "/my-leaves")
         except HTTPStatusError as exc:
             detail = exc.response.json().get("detail", t("login_failed"))
             error_text.value = detail
             page.update()
+        except Exception:
+            error_text.value = t("login_failed")
+            page.update()
 
     def go_contact(_e):
-        _navigate(page, "/contact")
+        _nav(page, "/contact")
 
     def go_admin_login(_e):
-        _navigate(page, "/admin-login")
+        _nav(page, "/admin-login")
 
     return ft.Column(
         [
@@ -282,7 +299,7 @@ def build_contact_page(page: ft.Page):
         page.update()
 
     def go_back(_e):
-        _navigate(page, "/login")
+        _nav(page, "/login")
 
     return ft.Column(
         [
@@ -339,7 +356,7 @@ def build_my_leaves_page(page: ft.Page):
     def _leave_card(lv: dict) -> ft.Container:
         def edit(_e, lid=lv["id"]):
             _editing_leave_id[0] = lid
-            _navigate(page, "/leave-form")
+            _nav(page, "/leave-form")
 
         def delete(_e, lid=lv["id"]):
             try:
@@ -368,7 +385,7 @@ def build_my_leaves_page(page: ft.Page):
 
     def _open_add(_e):
         _editing_leave_id[0] = None
-        _navigate(page, "/leave-form")
+        _nav(page, "/leave-form")
 
     def _manual_refresh(_e):
         _refresh()
@@ -531,13 +548,16 @@ def build_leave_form_page(page: ft.Page):
                 api.update_leave(editing_id, d, s, en, n)
             else:
                 api.create_leave(d, s, en, n)
-            _navigate(page, "/my-leaves")
+            _nav(page, "/my-leaves")
         except HTTPStatusError as exc:
             form_error.value = exc.response.json().get("detail", "儲存失敗")
             page.update()
+        except Exception:
+            form_error.value = t("submit_failed")
+            page.update()
 
     def _cancel(_e):
-        _navigate(page, "/my-leaves")
+        _nav(page, "/my-leaves")
 
     title = t("edit_leave") if is_edit else t("add_leave")
 
@@ -800,13 +820,16 @@ def build_admin_login_page(page: ft.Page):
         error_text.value = ""
         try:
             api.admin_login(usr.value.strip(), pwd.value)
-            _navigate(page, "/admin")
+            _nav(page, "/admin")
         except HTTPStatusError as exc:
             error_text.value = exc.response.json().get("detail", t("login_failed"))
             page.update()
+        except Exception:
+            error_text.value = t("login_failed")
+            page.update()
 
     def go_back(_e):
-        _navigate(page, "/login")
+        _nav(page, "/login")
 
     return ft.Column(
         [
@@ -956,35 +979,58 @@ def build_admin_page(page: ft.Page):
     ]
     page.overlay.append(dlg)
 
-    tabs = ft.Tabs(
-        selected_index=0,
-        tabs=[
-            ft.Tab(text=t("user_management"), content=ft.Column([
-                ft.Row([
-                    ft.Text(t("user_list"), size=18, weight=ft.FontWeight.BOLD, expand=True),
-                    ft.ElevatedButton(t("add_user"), icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add_user),
-                ]),
-                users_list,
-            ], expand=True)),
-            ft.Tab(text=t("message_management"), content=ft.Column([
-                ft.Text(t("message_list"), size=18, weight=ft.FontWeight.BOLD),
-                messages_list,
-            ], expand=True)),
-        ],
-        expand=True,
-    )
+    # -- Tab content panels --
+    users_panel = ft.Column([
+        ft.Row([
+            ft.Text(t("user_list"), size=18, weight=ft.FontWeight.BOLD, expand=True),
+            ft.ElevatedButton(t("add_user"), icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add_user),
+        ]),
+        users_list,
+    ], expand=True)
 
-    def on_tab_change(_e):
-        if tabs.selected_index == 0:
+    messages_panel = ft.Column([
+        ft.Text(t("message_list"), size=18, weight=ft.FontWeight.BOLD),
+        messages_list,
+    ], expand=True)
+
+    tab_content = ft.Container(content=users_panel, expand=True)
+    _active_tab: list[int] = [0]
+
+    def _tab_btn(label: str, idx: int):
+        is_active = _active_tab[0] == idx
+        return ft.TextButton(
+            label,
+            style=ft.ButtonStyle(
+                color=INDIGO if is_active else GRAY_500,
+                bgcolor=INDIGO_LIGHT if is_active else None,
+            ),
+            on_click=lambda _e: _switch_tab(idx),
+        )
+
+    def _switch_tab(idx: int):
+        _active_tab[0] = idx
+        if idx == 0:
+            tab_content.content = users_panel
             _refresh_users()
         else:
+            tab_content.content = messages_panel
             _refresh_messages()
+        _rebuild_tab_bar()
+        page.update()
 
-    tabs.on_change = on_tab_change
+    tab_bar = ft.Row(spacing=0)
+
+    def _rebuild_tab_bar():
+        tab_bar.controls = [
+            _tab_btn(t("user_management"), 0),
+            _tab_btn(t("message_management"), 1),
+        ]
+
+    _rebuild_tab_bar()
 
     def admin_logout(_e):
         api.is_admin = False
-        _navigate(page, "/login")
+        _nav(page, "/login")
 
     _refresh_users()
     _refresh_messages()
@@ -996,7 +1042,8 @@ def build_admin_page(page: ft.Page):
             ft.OutlinedButton(t("admin_logout"), on_click=admin_logout),
         ]),
         ft.Divider(height=1),
-        tabs,
+        tab_bar,
+        tab_content,
     ], expand=True)
 
 
@@ -1012,12 +1059,12 @@ def _navbar(page: ft.Page, active: str) -> ft.Container:
             style=ft.ButtonStyle(
                 color=INDIGO if is_active else GRAY_500,
             ),
-            on_click=lambda _e: _navigate(page, route),
+            on_click=lambda _e: _nav(page, route),
         )
 
     def logout(_e):
         api.logout()
-        _navigate(page, "/login")
+        _nav(page, "/login")
 
     return ft.Container(
         ft.Column([
