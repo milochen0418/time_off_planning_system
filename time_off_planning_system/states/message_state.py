@@ -3,6 +3,7 @@ from typing import TypedDict
 from datetime import datetime
 
 from time_off_planning_system.store import store, Message
+from time_off_planning_system.i18n import get_text
 
 
 class MessageState(rx.State):
@@ -38,7 +39,10 @@ class MessageState(rx.State):
         self.form_contact_value = ""
 
     @rx.event
-    def submit_message(self):
+    async def submit_message(self):
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
         self.form_error = ""
         self.form_success = ""
         if not all(
@@ -50,7 +54,7 @@ class MessageState(rx.State):
                 self.form_message,
             ]
         ):
-            self.form_error = "請填寫所有欄位"
+            self.form_error = get_text(lang, "fill_all_fields")
             return
         store.add_message(
             employee_id=self.form_employee_id,
@@ -67,13 +71,16 @@ class MessageState(rx.State):
         self.form_email = ""
         self.form_contact_value = ""
         self.form_message = ""
-        self.form_success = "留言已送出，管理者將盡快與您聯繫！"
+        self.form_success = get_text(lang, "message_sent")
 
     @rx.event
-    def delete_message(self, msg_id: int):
+    async def delete_message(self, msg_id: int):
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
         store.delete_message(msg_id)
         self._rev += 1
-        yield rx.toast("留言已刪除")
+        yield rx.toast(get_text(lang, "message_deleted"))
 
     @rx.event
     def check_store_update(self, _timestamp: str):
