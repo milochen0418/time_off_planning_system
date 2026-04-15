@@ -103,7 +103,7 @@ async def _poll_async():
         while _poll_running[0]:
             await asyncio.sleep(3)
             page = _page_ref[0]
-            if not page or not api.user_id:
+            if not page or (not api.user_id and not api.is_admin):
                 continue
 
             try:
@@ -114,7 +114,7 @@ async def _poll_async():
                     _last_revision[0] = rev
                     fn = _page_refresh_fn[0]
                     route = _current_route[0]
-                    if fn and route in ("/my-leaves", "/calendar"):
+                    if fn and route in ("/my-leaves", "/calendar", "/admin"):
                         await asyncio.to_thread(fn)
                         page.update()
             except Exception:
@@ -867,7 +867,11 @@ def build_admin_page(page: ft.Page):
 
     dlg = ft.AlertDialog(modal=True, title=form_title)
 
-    def _refresh_users():
+    def _fetch_and_build_users():
+        """Sync HTTP fetch + rebuild user controls. NO page.update().
+
+        Safe to call from a worker thread via asyncio.to_thread().
+        """
         users_list.controls.clear()
         try:
             users = api.admin_list_users()
@@ -897,9 +901,16 @@ def build_admin_page(page: ft.Page):
                 padding=10, border=ft.border.all(1, GRAY_100), border_radius=8,
                 bgcolor="white", margin=ft.margin.only(bottom=6),
             ))
+
+    def _refresh_users():
+        _fetch_and_build_users()
         page.update()
 
-    def _refresh_messages():
+    def _fetch_and_build_messages():
+        """Sync HTTP fetch + rebuild message controls. NO page.update().
+
+        Safe to call from a worker thread via asyncio.to_thread().
+        """
         messages_list.controls.clear()
         try:
             msgs = api.list_messages()
@@ -928,6 +939,9 @@ def build_admin_page(page: ft.Page):
                 padding=10, border=ft.border.all(1, GRAY_100), border_radius=8,
                 bgcolor="white", margin=ft.margin.only(bottom=6),
             ))
+
+    def _refresh_messages():
+        _fetch_and_build_messages()
         page.update()
 
     def _open_add_user(_e):
@@ -1032,6 +1046,19 @@ def build_admin_page(page: ft.Page):
         api.is_admin = False
         _nav(page, "/login")
 
+    def _admin_refresh():
+        """Sync data fetch + rebuild controls. NO page.update().
+
+        Called by the polling loop via asyncio.to_thread() on a worker
+        thread. The polling loop handles page.update() on the UI thread
+        after this returns.
+        """
+        if _active_tab[0] == 0:
+            _fetch_and_build_users()
+        else:
+            _fetch_and_build_messages()
+
+    _page_refresh_fn[0] = _admin_refresh
     _refresh_users()
     _refresh_messages()
 
