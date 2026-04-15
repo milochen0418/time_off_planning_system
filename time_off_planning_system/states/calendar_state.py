@@ -3,6 +3,7 @@ import calendar
 from datetime import datetime, timedelta
 
 from time_off_planning_system.store import store
+from time_off_planning_system.i18n import MONTH_NAMES_EN, WEEKDAYS_FULL_EN, WEEKDAYS_FULL_ZH
 
 
 def get_color_class(name: str) -> str:
@@ -27,53 +28,45 @@ class CalendarState(rx.State):
     view_mode: str = "month"
 
     @rx.var
-    def display_title(self) -> str:
+    async def display_title(self) -> str:
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
+
         if self.view_mode == "month":
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[self.current_month]} {self.current_year}"
             return f"{self.current_year}年 {self.current_month}月"
         elif self.view_mode == "week":
             date = datetime(self.current_year, self.current_month, self.current_day)
             start = date - timedelta(days=date.weekday())
             end = start + timedelta(days=6)
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[self.current_month]} {self.current_year} ({start.month}/{start.day} - {end.month}/{end.day})"
             return f"{self.current_year}年 {self.current_month}月 ({start.month}/{start.day} - {end.month}/{end.day})"
         else:
             date = datetime(self.current_year, self.current_month, self.current_day)
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[self.current_month]} {self.current_day}, {self.current_year} ({WEEKDAYS_FULL_EN[date.weekday()]})"
             weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             return f"{self.current_year}年 {self.current_month}月 {self.current_day}日 (星期{weekdays[date.weekday()]})"
 
     @rx.var
-    def month_grid(self) -> list[list[dict]]:
-        cal = calendar.Calendar(firstweekday=6)
-        weeks = cal.monthdayscalendar(self.current_year, self.current_month)
-        today = datetime.now()
-        grid = []
-        for week in weeks:
-            row = []
-            for day in week:
-                is_today = (
-                    self.current_year == today.year
-                    and self.current_month == today.month
-                    and (day == today.day)
-                )
-                date_str = ""
-                if day > 0:
-                    date_str = f"{self.current_year}-{self.current_month:02d}-{day:02d}"
-                row.append(
-                    {
-                        "day": day,
-                        "is_current_month": day > 0,
-                        "is_today": is_today,
-                        "date_str": date_str,
-                    }
-                )
-            grid.append(row)
-        return grid
+    async def weekday_headers(self) -> list[str]:
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
+        if lang == "en":
+            return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return ["日", "一", "二", "三", "四", "五", "六"]
 
-    @rx.var
-    def week_dates(self) -> list[dict]:
+    def _compute_week_dates(self, lang: str) -> list[dict]:
         date = datetime(self.current_year, self.current_month, self.current_day)
         start = date - timedelta(days=date.weekday())
         today = datetime.now()
-        weekdays = ["一", "二", "三", "四", "五", "六", "日"]
+        weekdays_zh = ["一", "二", "三", "四", "五", "六", "日"]
+        weekdays_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        weekdays = weekdays_en if lang == "en" else weekdays_zh
         dates = []
         for i in range(7):
             curr = start + timedelta(days=i)
@@ -93,6 +86,46 @@ class CalendarState(rx.State):
         return dates
 
     @rx.var
+    async def week_dates(self) -> list[dict]:
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        return self._compute_week_dates(lang_state.lang)
+
+    @rx.var
+    def month_grid(self) -> list[list[dict[str, str | int | bool]]]:
+        cal = calendar.Calendar(firstweekday=6)  # Sunday first
+        today = datetime.now()
+        weeks: list[list[dict[str, str | int | bool]]] = []
+        for week in cal.monthdayscalendar(self.current_year, self.current_month):
+            row: list[dict[str, str | int | bool]] = []
+            for day in week:
+                if day == 0:
+                    row.append(
+                        {
+                            "day": 0,
+                            "date_str": "",
+                            "is_today": False,
+                            "is_current_month": False,
+                        }
+                    )
+                else:
+                    is_today = (
+                        self.current_year == today.year
+                        and self.current_month == today.month
+                        and day == today.day
+                    )
+                    row.append(
+                        {
+                            "day": day,
+                            "date_str": f"{self.current_year}-{self.current_month:02d}-{day:02d}",
+                            "is_today": is_today,
+                            "is_current_month": True,
+                        }
+                    )
+            weeks.append(row)
+        return weeks
+
+    @rx.var
     def current_date_str(self) -> str:
         return f"{self.current_year}-{self.current_month:02d}-{self.current_day:02d}"
 
@@ -105,12 +138,15 @@ class CalendarState(rx.State):
         self,
     ) -> list[dict[str, str | int | bool | list[dict[str, str | int]]]]:
         from time_off_planning_system.states.leave_state import LeaveState
+        from time_off_planning_system.states.lang_state import LangState
 
         leave_state = await self.get_state(LeaveState)
+        lang_state = await self.get_state(LangState)
         _ = leave_state._rev
         all_leaves = store.leaves
         cols: list[dict[str, str | int | bool | list[dict[str, str | int]]]] = []
-        for d in self.week_dates:
+        week_dates = self._compute_week_dates(lang_state.lang)
+        for d in week_dates:
             date_str = d["date_str"]
             day_leaves: list[dict[str, str | int]] = []
             for L in all_leaves:

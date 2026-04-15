@@ -1,7 +1,9 @@
 import reflex as rx
 from time_off_planning_system.states.auth_state import AuthState
 from time_off_planning_system.states.leave_state import LeaveState, Leave
+from time_off_planning_system.states.lang_state import LangState
 from time_off_planning_system.components.layout import protected_layout
+from time_off_planning_system.i18n import t
 
 
 def index() -> rx.Component:
@@ -12,19 +14,37 @@ def index() -> rx.Component:
     )
 
 
+def _lang_selector() -> rx.Component:
+    """Language selector dropdown."""
+    return rx.el.div(
+        rx.el.select(
+            rx.el.option("繁體中文", value="zh"),
+            rx.el.option("English", value="en"),
+            on_change=LangState.set_lang,
+            value=LangState.lang,
+            class_name="rounded-md border-gray-300 shadow-sm text-sm p-1.5 border bg-white appearance-none cursor-pointer",
+        ),
+        class_name="flex items-center gap-2",
+    )
+
+
 def login_page() -> rx.Component:
     return rx.el.div(
         rx.el.div(
+            rx.el.div(
+                _lang_selector(),
+                class_name="absolute top-4 right-4",
+            ),
             rx.el.div(
                 rx.icon(
                     "calendar-days", class_name="mx-auto h-12 w-auto text-indigo-600"
                 ),
                 rx.el.h2(
-                    "預約休假管理系統",
+                    t("app_title"),
                     class_name="mt-6 text-center text-3xl font-extrabold tracking-tight text-gray-900",
                 ),
                 rx.el.p(
-                    "登入您的帳號", class_name="mt-2 text-center text-sm text-gray-600"
+                    t("login_subtitle"), class_name="mt-2 text-center text-sm text-gray-600"
                 ),
                 class_name="sm:mx-auto sm:w-full sm:max-w-md",
             ),
@@ -32,11 +52,11 @@ def login_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.label(
-                            "帳號 (Username)",
+                            t("username_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
-                            placeholder="請輸入帳號",
+                            placeholder=t("username_placeholder"),
                             on_change=AuthState.set_login_username,
                             class_name="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border",
                         ),
@@ -44,12 +64,12 @@ def login_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "密碼 (Password)",
+                            t("password_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
                             type="password",
-                            placeholder="請輸入密碼",
+                            placeholder=t("password_placeholder"),
                             on_change=AuthState.set_login_password,
                             class_name="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border",
                         ),
@@ -63,14 +83,14 @@ def login_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "登入系統",
+                        t("login_btn"),
                         on_click=AuthState.login,
                         class_name="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all",
                     ),
                     rx.el.div(
-                        rx.el.span("尚未擁有帳號？", class_name="text-gray-500"),
+                        rx.el.span(t("no_account"), class_name="text-gray-500"),
                         rx.el.a(
-                            "留言給超級管理者",
+                            t("contact_admin_link"),
                             href="/contact",
                             class_name="ml-1 font-medium text-indigo-600 hover:text-indigo-500",
                         ),
@@ -78,7 +98,7 @@ def login_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.a(
-                            "超級管理者登入",
+                            t("admin_login_link"),
                             href="/admin-login",
                             class_name="text-xs text-gray-400 hover:text-indigo-500 transition-colors",
                         ),
@@ -88,7 +108,7 @@ def login_page() -> rx.Component:
                 ),
                 class_name="mt-8 sm:mx-auto sm:w-full sm:max-w-md",
             ),
-            class_name="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
+            class_name="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
         ),
         on_mount=AuthState.check_logged_in,
     )
@@ -98,9 +118,13 @@ def register_page() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.div(
+                _lang_selector(),
+                class_name="absolute top-4 right-4",
+            ),
+            rx.el.div(
                 rx.icon("user-plus", class_name="mx-auto h-12 w-auto text-indigo-600"),
                 rx.el.h2(
-                    "建立新帳號",
+                    t("create_account"),
                     class_name="mt-6 text-center text-3xl font-extrabold tracking-tight text-gray-900",
                 ),
                 class_name="sm:mx-auto sm:w-full sm:max-w-md",
@@ -109,11 +133,11 @@ def register_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.label(
-                            "顯示名稱 (Display Name)",
+                            t("display_name_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
-                            placeholder="例如：小明",
+                            placeholder=t("display_name_placeholder"),
                             on_change=AuthState.set_reg_display_name,
                             class_name="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border",
                         ),
@@ -121,11 +145,11 @@ def register_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "登入帳號 (Username)",
+                            t("reg_username_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
-                            placeholder="例如：xiaoming123",
+                            placeholder=t("reg_username_placeholder"),
                             on_change=AuthState.set_reg_username,
                             class_name="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border",
                         ),
@@ -133,7 +157,7 @@ def register_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "密碼 (Password)",
+                            t("password_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
@@ -145,7 +169,7 @@ def register_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "確認密碼 (Confirm Password)",
+                            t("confirm_password_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
@@ -170,14 +194,14 @@ def register_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "立即註冊",
+                        t("register_btn"),
                         on_click=AuthState.register,
                         class_name="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all",
                     ),
                     rx.el.div(
-                        rx.el.span("系統問題或權限申請？", class_name="text-gray-500"),
+                        rx.el.span(t("system_issue"), class_name="text-gray-500"),
                         rx.el.a(
-                            "留言給超級管理者",
+                            t("contact_admin_link"),
                             href="/contact",
                             class_name="ml-1 font-medium text-indigo-600 hover:text-indigo-500",
                         ),
@@ -187,7 +211,7 @@ def register_page() -> rx.Component:
                 ),
                 class_name="mt-8 sm:mx-auto sm:w-full sm:max-w-md",
             ),
-            class_name="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
+            class_name="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
         ),
         on_mount=AuthState.check_logged_in,
     )
@@ -254,13 +278,13 @@ def leave_form_modal() -> rx.Component:
                     rx.el.div(
                         rx.el.h3(
                             rx.cond(
-                                LeaveState.editing_id == -1, "新增休假", "編輯休假"
+                                LeaveState.editing_id == -1, t("add_leave"), t("edit_leave")
                             ),
                             class_name="text-xl font-bold text-gray-900 mb-4",
                         ),
                         rx.el.div(
                             rx.el.label(
-                                "日期",
+                                t("date_label"),
                                 class_name="block text-sm font-medium text-gray-700 mb-1",
                             ),
                             rx.el.input(
@@ -272,7 +296,7 @@ def leave_form_modal() -> rx.Component:
                             rx.el.div(
                                 rx.el.div(
                                     rx.el.label(
-                                        "開始時間",
+                                        t("start_time_label"),
                                         class_name="block text-sm font-medium text-gray-700 mb-1",
                                     ),
                                     rx.el.input(
@@ -285,7 +309,7 @@ def leave_form_modal() -> rx.Component:
                                 ),
                                 rx.el.div(
                                     rx.el.label(
-                                        "結束時間",
+                                        t("end_time_label"),
                                         class_name="block text-sm font-medium text-gray-700 mb-1",
                                     ),
                                     rx.el.input(
@@ -299,11 +323,11 @@ def leave_form_modal() -> rx.Component:
                                 class_name="flex gap-4 mb-4",
                             ),
                             rx.el.label(
-                                "備註 (選填)",
+                                t("note_label"),
                                 class_name="block text-sm font-medium text-gray-700 mb-1",
                             ),
                             rx.el.input(
-                                placeholder="例如：去醫院掛號",
+                                placeholder=t("note_placeholder"),
                                 on_change=LeaveState.set_form_note,
                                 class_name="w-full p-2 border rounded-md mb-4",
                                 default_value=LeaveState.form_note,
@@ -317,12 +341,12 @@ def leave_form_modal() -> rx.Component:
                             ),
                             rx.el.div(
                                 rx.el.button(
-                                    "取消",
+                                    t("cancel"),
                                     on_click=LeaveState.close_form,
                                     class_name="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200",
                                 ),
                                 rx.el.button(
-                                    "儲存",
+                                    t("save"),
                                     on_click=LeaveState.save_leave,
                                     class_name="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700",
                                 ),
@@ -349,17 +373,17 @@ def my_leaves_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.h3(
-                            "我的休假清單",
+                            t("my_leaves_title"),
                             class_name="text-2xl font-bold text-gray-900",
                         ),
                         rx.el.p(
-                            "管理您的個人預約記錄。", class_name="text-gray-500 text-sm"
+                            t("my_leaves_subtitle"), class_name="text-gray-500 text-sm"
                         ),
                         class_name="flex-1",
                     ),
                     rx.el.button(
                         rx.icon("plus", class_name="h-4 w-4 mr-2"),
-                        "新增休假",
+                        t("add_leave"),
                         on_click=LeaveState.open_add_form,
                         class_name="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors",
                     ),
@@ -373,11 +397,11 @@ def my_leaves_page() -> rx.Component:
                             class_name="mx-auto h-12 w-12 text-gray-300 mb-4",
                         ),
                         rx.el.h3(
-                            "尚未有任何休假記錄",
+                            t("no_leaves"),
                             class_name="text-lg font-medium text-gray-900",
                         ),
                         rx.el.p(
-                            "點擊上方按鈕來新增您的第一筆預約。",
+                            t("no_leaves_hint"),
                             class_name="mt-1 text-sm text-gray-500",
                         ),
                         class_name="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200",
@@ -397,15 +421,19 @@ def admin_login_page() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.div(
+                _lang_selector(),
+                class_name="absolute top-4 right-4",
+            ),
+            rx.el.div(
                 rx.icon(
                     "shield-check", class_name="mx-auto h-12 w-auto text-slate-700"
                 ),
                 rx.el.h2(
-                    "超級管理者登入",
+                    t("admin_login_title"),
                     class_name="mt-6 text-center text-3xl font-extrabold tracking-tight text-slate-900",
                 ),
                 rx.el.p(
-                    "後台管理系統", class_name="mt-2 text-center text-sm text-slate-600"
+                    t("admin_panel_subtitle"), class_name="mt-2 text-center text-sm text-slate-600"
                 ),
                 class_name="sm:mx-auto sm:w-full sm:max-w-md",
             ),
@@ -413,7 +441,7 @@ def admin_login_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.label(
-                            "管理員帳號",
+                            t("admin_username_label"),
                             class_name="block text-sm font-medium text-slate-700",
                         ),
                         rx.el.input(
@@ -425,7 +453,7 @@ def admin_login_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "管理員密碼",
+                            t("admin_password_label"),
                             class_name="block text-sm font-medium text-slate-700",
                         ),
                         rx.el.input(
@@ -444,13 +472,13 @@ def admin_login_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "登入後台",
+                        t("admin_login_btn"),
                         on_click=AdminState.admin_login,
                         class_name="flex w-full justify-center rounded-md border border-transparent bg-slate-800 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-slate-900 transition-all",
                     ),
                     rx.el.div(
                         rx.el.a(
-                            "返回一般使用者登入",
+                            t("back_to_user_login"),
                             href="/login",
                             class_name="font-medium text-slate-600 hover:text-slate-500",
                         ),
@@ -460,7 +488,7 @@ def admin_login_page() -> rx.Component:
                 ),
                 class_name="mt-8 sm:mx-auto sm:w-full sm:max-w-md",
             ),
-            class_name="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50",
+            class_name="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50",
         ),
         on_mount=AdminState.check_admin_logged_in,
     )
@@ -480,14 +508,14 @@ def user_form_modal() -> rx.Component:
                         rx.el.h3(
                             rx.cond(
                                 AdminState.editing_user_id == -1,
-                                "新增使用者",
-                                "編輯使用者",
+                                t("add_user"),
+                                t("edit_user"),
                             ),
                             class_name="text-xl font-bold text-slate-900 mb-4",
                         ),
                         rx.el.div(
                             rx.el.label(
-                                "顯示名稱",
+                                t("display_name"),
                                 class_name="block text-sm font-medium text-slate-700 mb-1",
                             ),
                             rx.el.input(
@@ -496,7 +524,7 @@ def user_form_modal() -> rx.Component:
                                 default_value=AdminState.form_display_name,
                             ),
                             rx.el.label(
-                                "帳號 (Username)",
+                                t("username_label"),
                                 class_name="block text-sm font-medium text-slate-700 mb-1",
                             ),
                             rx.el.input(
@@ -505,7 +533,7 @@ def user_form_modal() -> rx.Component:
                                 default_value=AdminState.form_username,
                             ),
                             rx.el.label(
-                                "密碼",
+                                t("password"),
                                 class_name="block text-sm font-medium text-slate-700 mb-1",
                             ),
                             rx.el.input(
@@ -523,12 +551,12 @@ def user_form_modal() -> rx.Component:
                             ),
                             rx.el.div(
                                 rx.el.button(
-                                    "取消",
+                                    t("cancel"),
                                     on_click=AdminState.close_user_form,
                                     class_name="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200",
                                 ),
                                 rx.el.button(
-                                    "儲存",
+                                    t("save"),
                                     on_click=AdminState.save_user,
                                     class_name="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700",
                                 ),
@@ -632,13 +660,13 @@ def admin_dashboard_page() -> rx.Component:
                     rx.el.div(
                         rx.icon("shield-check", class_name="h-8 w-8 text-white"),
                         rx.el.span(
-                            "超級管理者後台",
+                            t("admin_dashboard_title"),
                             class_name="ml-2 text-xl font-bold text-white",
                         ),
                         class_name="flex items-center",
                     ),
                     rx.el.button(
-                        "登出後台",
+                        t("admin_logout"),
                         on_click=AdminState.admin_logout,
                         class_name="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors",
                     ),
@@ -654,7 +682,7 @@ def admin_dashboard_page() -> rx.Component:
                     rx.el.div(
                         rx.el.nav(
                             rx.el.button(
-                                "使用者管理",
+                                t("user_management"),
                                 on_click=lambda: AdminState.set_active_tab("users"),
                                 class_name=rx.cond(
                                     AdminState.active_tab == "users",
@@ -663,7 +691,7 @@ def admin_dashboard_page() -> rx.Component:
                                 ),
                             ),
                             rx.el.button(
-                                "留言板管理",
+                                t("message_management"),
                                 on_click=lambda: AdminState.set_active_tab("messages"),
                                 class_name=rx.cond(
                                     AdminState.active_tab == "messages",
@@ -682,12 +710,12 @@ def admin_dashboard_page() -> rx.Component:
                             rx.el.div(
                                 rx.el.div(
                                     rx.el.h2(
-                                        "使用者管理",
+                                        t("user_management"),
                                         class_name="text-2xl font-bold text-slate-900",
                                     ),
                                     rx.el.button(
                                         rx.icon("plus", class_name="h-4 w-4 mr-2"),
-                                        "新增使用者",
+                                        t("add_user"),
                                         on_click=AdminState.open_add_user_form,
                                         class_name="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm",
                                     ),
@@ -702,15 +730,15 @@ def admin_dashboard_page() -> rx.Component:
                                                     class_name="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider",
                                                 ),
                                                 rx.el.th(
-                                                    "顯示名稱",
+                                                    t("display_name"),
                                                     class_name="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider",
                                                 ),
                                                 rx.el.th(
-                                                    "帳號",
+                                                    t("username"),
                                                     class_name="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider",
                                                 ),
                                                 rx.el.th(
-                                                    "操作",
+                                                    t("actions"),
                                                     class_name="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider",
                                                 ),
                                             ),
@@ -778,11 +806,15 @@ def admin_dashboard_page() -> rx.Component:
                                 rx.el.div(
                                     rx.el.div(
                                         rx.el.h2(
-                                            "留言板管理",
+                                            t("message_management"),
                                             class_name="text-2xl font-bold text-slate-900",
                                         ),
                                         rx.el.p(
-                                            f"目前共有 {MessageState.messages.length()} 則留言",
+                                            rx.cond(
+                                                LangState.lang == "en",
+                                                "Currently " + MessageState.messages.length().to(str) + " messages",
+                                                "目前共有 " + MessageState.messages.length().to(str) + " 則留言",
+                                            ),
                                             class_name="text-slate-500 text-sm",
                                         ),
                                     ),
@@ -796,7 +828,7 @@ def admin_dashboard_page() -> rx.Component:
                                             class_name="h-12 w-12 text-slate-300 mx-auto mb-4",
                                         ),
                                         rx.el.p(
-                                            "尚無任何留言",
+                                            t("no_messages"),
                                             class_name="text-slate-400 font-medium",
                                         ),
                                         class_name="text-center py-20 bg-white border-2 border-dashed border-slate-200 rounded-xl",
@@ -877,11 +909,10 @@ def month_cell(cell_data: dict) -> rx.Component:
 
 
 def month_view() -> rx.Component:
-    weekdays = ["日", "一", "二", "三", "四", "五", "六"]
     return rx.el.div(
         rx.el.div(
             rx.foreach(
-                weekdays,
+                CalendarState.weekday_headers,
                 lambda d: rx.el.div(
                     d,
                     class_name="py-2 text-center text-sm font-semibold text-gray-700 border border-gray-200 bg-gray-50",
@@ -1011,15 +1042,19 @@ def contact_page() -> rx.Component:
     return rx.el.div(
         rx.el.div(
             rx.el.div(
+                _lang_selector(),
+                class_name="absolute top-4 right-4",
+            ),
+            rx.el.div(
                 rx.icon(
                     "message-square", class_name="mx-auto h-12 w-auto text-indigo-600"
                 ),
                 rx.el.h2(
-                    "留言給超級管理者",
+                    t("contact_admin_title"),
                     class_name="mt-6 text-center text-3xl font-extrabold text-gray-900",
                 ),
                 rx.el.p(
-                    "若您忘記密碼或需要開通權限，請填寫下方表單。",
+                    t("contact_subtitle"),
                     class_name="mt-2 text-center text-sm text-gray-600",
                 ),
                 class_name="sm:mx-auto sm:w-full sm:max-w-md",
@@ -1028,7 +1063,7 @@ def contact_page() -> rx.Component:
                 rx.el.div(
                     rx.el.div(
                         rx.el.label(
-                            "員工編號 (Employee ID)",
+                            t("employee_id_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
@@ -1040,7 +1075,7 @@ def contact_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "姓名 (Name)",
+                            t("name_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
@@ -1052,7 +1087,7 @@ def contact_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "信箱 (Email)",
+                            t("email_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.input(
@@ -1066,7 +1101,7 @@ def contact_page() -> rx.Component:
                     rx.el.div(
                         rx.el.div(
                             rx.el.label(
-                                "通訊方式",
+                                t("contact_method_label"),
                                 class_name="block text-sm font-medium text-gray-700",
                             ),
                             rx.el.select(
@@ -1082,17 +1117,27 @@ def contact_page() -> rx.Component:
                         ),
                         rx.el.div(
                             rx.el.label(
-                                "帳號/號碼",
+                                t("contact_value_label"),
                                 class_name="block text-sm font-medium text-gray-700",
                             ),
                             rx.el.input(
                                 on_change=MessageState.set_form_contact_value,
-                                placeholder=rx.match(
-                                    MessageState.form_contact_method,
-                                    ("Line", "請輸入 Line ID"),
-                                    ("WhatsApp", "請輸入電話號碼"),
-                                    ("Phone", "請輸入電話號碼"),
-                                    "請輸入聯絡方式",
+                                placeholder=rx.cond(
+                                    LangState.lang == "en",
+                                    rx.match(
+                                        MessageState.form_contact_method,
+                                        ("Line", "Enter Line ID"),
+                                        ("WhatsApp", "Enter phone number"),
+                                        ("Phone", "Enter phone number"),
+                                        "Enter contact info",
+                                    ),
+                                    rx.match(
+                                        MessageState.form_contact_method,
+                                        ("Line", "請輸入 Line ID"),
+                                        ("WhatsApp", "請輸入電話號碼"),
+                                        ("Phone", "請輸入電話號碼"),
+                                        "請輸入聯絡方式",
+                                    ),
                                 ),
                                 class_name="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border sm:text-sm",
                                 default_value=MessageState.form_contact_value,
@@ -1103,7 +1148,7 @@ def contact_page() -> rx.Component:
                     ),
                     rx.el.div(
                         rx.el.label(
-                            "留言內容",
+                            t("message_content_label"),
                             class_name="block text-sm font-medium text-gray-700",
                         ),
                         rx.el.textarea(
@@ -1129,13 +1174,13 @@ def contact_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "送出留言",
+                        t("submit_message"),
                         on_click=MessageState.submit_message,
                         class_name="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors mb-4",
                     ),
                     rx.el.div(
                         rx.el.a(
-                            "返回登入頁面",
+                            t("back_to_login"),
                             href="/login",
                             class_name="text-sm font-medium text-indigo-600 hover:text-indigo-500",
                         ),
@@ -1145,7 +1190,7 @@ def contact_page() -> rx.Component:
                 ),
                 class_name="mt-8 sm:mx-auto sm:w-full sm:max-w-lg",
             ),
-            class_name="flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
+            class_name="relative flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50",
         )
     )
 
@@ -1161,7 +1206,7 @@ def calendar_page() -> rx.Component:
                         class_name="p-2 rounded-md border hover:bg-gray-50",
                     ),
                     rx.el.button(
-                        "今天",
+                        t("today"),
                         on_click=CalendarState.go_today,
                         class_name="px-4 py-2 border rounded-md hover:bg-gray-50 font-medium",
                     ),
@@ -1178,7 +1223,7 @@ def calendar_page() -> rx.Component:
                 ),
                 rx.el.div(
                     rx.el.button(
-                        "月",
+                        t("month_view"),
                         on_click=lambda: CalendarState.set_view_mode("month"),
                         class_name=rx.cond(
                             CalendarState.view_mode == "month",
@@ -1187,7 +1232,7 @@ def calendar_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "週",
+                        t("week_view"),
                         on_click=lambda: CalendarState.set_view_mode("week"),
                         class_name=rx.cond(
                             CalendarState.view_mode == "week",
@@ -1196,7 +1241,7 @@ def calendar_page() -> rx.Component:
                         ),
                     ),
                     rx.el.button(
-                        "日",
+                        t("day_view"),
                         on_click=lambda: CalendarState.set_view_mode("day"),
                         class_name=rx.cond(
                             CalendarState.view_mode == "day",

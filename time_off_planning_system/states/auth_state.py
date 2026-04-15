@@ -3,6 +3,7 @@ import asyncio
 from typing import Optional, TypedDict
 
 from time_off_planning_system.store import store, User
+from time_off_planning_system.i18n import get_text
 
 
 class AuthState(rx.State):
@@ -29,7 +30,10 @@ class AuthState(rx.State):
         return store.users
 
     @rx.event
-    def login(self):
+    async def login(self):
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
         self.login_error = ""
         found_user = None
         for u in store.users:
@@ -48,10 +52,13 @@ class AuthState(rx.State):
             self.login_password = ""
             return rx.redirect("/my-leaves")
         else:
-            self.login_error = "帳號或密碼錯誤"
+            self.login_error = get_text(lang, "invalid_credentials")
 
     @rx.event
-    def register(self):
+    async def register(self):
+        from time_off_planning_system.states.lang_state import LangState
+        lang_state = await self.get_state(LangState)
+        lang = lang_state.lang
         self.register_error = ""
         self.register_success = ""
         if (
@@ -59,17 +66,17 @@ class AuthState(rx.State):
             or not self.reg_password
             or (not self.reg_display_name)
         ):
-            self.register_error = "請填寫所有欄位"
+            self.register_error = get_text(lang, "fill_all_fields")
             return
         if self.reg_password != self.reg_confirm_password:
-            self.register_error = "密碼不一致"
+            self.register_error = get_text(lang, "password_mismatch")
             return
         if store.find_user_by_name(self.reg_username):
-            self.register_error = "此帳號已被註冊"
+            self.register_error = get_text(lang, "username_taken")
             return
         store.add_user(self.reg_username, self.reg_password, self.reg_display_name)
         self._rev += 1
-        self.register_success = "註冊成功！請前往登入"
+        self.register_success = get_text(lang, "register_success")
         self.reg_username = ""
         self.reg_password = ""
         self.reg_confirm_password = ""

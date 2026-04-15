@@ -15,6 +15,7 @@ import flet as ft
 from httpx import HTTPStatusError
 
 from api_client import ApiClient
+from i18n import t, get_lang, set_lang, MONTH_NAMES_EN, WEEKDAYS_FULL_EN
 
 api = ApiClient()
 
@@ -176,8 +177,36 @@ def _navigate(page: ft.Page, route: str):
 
 def build_login_page(page: ft.Page):
     error_text = ft.Text("", color=RED, size=13)
-    username_field = ft.TextField(label="帳號 (Username)", width=320)
-    password_field = ft.TextField(label="密碼 (Password)", password=True, can_reveal_password=True, width=320)
+    username_field = ft.TextField(label=t("username_label"), width=320)
+    password_field = ft.TextField(label=t("password_label"), password=True, can_reveal_password=True, width=320)
+
+    def _do_switch_lang(lang: str):
+        """Switch language via page.run_task to ensure it runs on the UI event loop."""
+        set_lang(lang)
+
+        async def _rebuild():
+            _navigate(page, "/login")
+
+        page.run_task(_rebuild)
+
+    zh_btn = ft.OutlinedButton(
+        "中文",
+        style=ft.ButtonStyle(
+            bgcolor=INDIGO if get_lang() == "zh" else "white",
+            color="white" if get_lang() == "zh" else GRAY_700,
+            side=ft.BorderSide(1, INDIGO),
+        ),
+        on_click=lambda _e: _do_switch_lang("zh"),
+    )
+    en_btn = ft.OutlinedButton(
+        "EN",
+        style=ft.ButtonStyle(
+            bgcolor=INDIGO if get_lang() == "en" else "white",
+            color="white" if get_lang() == "en" else GRAY_700,
+            side=ft.BorderSide(1, INDIGO),
+        ),
+        on_click=lambda _e: _do_switch_lang("en"),
+    )
 
     def do_login(_e):
         error_text.value = ""
@@ -185,7 +214,7 @@ def build_login_page(page: ft.Page):
             api.login(username_field.value.strip(), password_field.value)
             _navigate(page, "/my-leaves")
         except HTTPStatusError as exc:
-            detail = exc.response.json().get("detail", "登入失敗")
+            detail = exc.response.json().get("detail", t("login_failed"))
             error_text.value = detail
             page.update()
 
@@ -197,20 +226,21 @@ def build_login_page(page: ft.Page):
 
     return ft.Column(
         [
+            ft.Row([ft.Container(expand=True), zh_btn, en_btn], alignment=ft.MainAxisAlignment.END),
             ft.Icon(ft.Icons.CALENDAR_MONTH, size=48, color=INDIGO),
-            ft.Text("預約休假管理系統", size=28, weight=ft.FontWeight.BOLD),
-            ft.Text("登入您的帳號", size=14, color=GRAY_500),
+            ft.Text(t("app_title"), size=28, weight=ft.FontWeight.BOLD),
+            ft.Text(t("login_subtitle"), size=14, color=GRAY_500),
             ft.Container(height=10),
             username_field,
             password_field,
             error_text,
-            ft.ElevatedButton("登入系統", bgcolor=INDIGO, color="white", width=320, on_click=do_login),
+            ft.ElevatedButton(t("login_btn"), bgcolor=INDIGO, color="white", width=320, on_click=do_login),
             ft.Container(height=8),
             ft.Row([
-                ft.Text("尚未擁有帳號？", color=GRAY_500, size=13),
-                ft.TextButton("留言給超級管理者", on_click=go_contact),
+                ft.Text(t("no_account"), color=GRAY_500, size=13),
+                ft.TextButton(t("contact_admin_link"), on_click=go_contact),
             ], alignment=ft.MainAxisAlignment.CENTER),
-            ft.TextButton("超級管理者登入", on_click=go_admin_login,
+            ft.TextButton(t("admin_login_link"), on_click=go_admin_login,
                           style=ft.ButtonStyle(color=GRAY_500)),
         ],
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -226,16 +256,16 @@ def build_login_page(page: ft.Page):
 def build_contact_page(page: ft.Page):
     error_text = ft.Text("", color=RED, size=13)
     success_text = ft.Text("", color=GREEN, size=13)
-    emp_id = ft.TextField(label="員工編號", width=400)
-    name_f = ft.TextField(label="姓名", width=400)
-    email_f = ft.TextField(label="Email", width=400)
+    emp_id = ft.TextField(label=t("employee_id_label"), width=400)
+    name_f = ft.TextField(label=t("name_label"), width=400)
+    email_f = ft.TextField(label=t("email_label"), width=400)
     contact_method = ft.Dropdown(
-        label="聯絡方式", width=400,
+        label=t("contact_method_label"), width=400,
         options=[ft.dropdown.Option(m) for m in ["Line", "WhatsApp", "Phone", "Other"]],
         value="Line",
     )
-    contact_value = ft.TextField(label="聯絡資訊", width=400)
-    message_f = ft.TextField(label="留言內容", width=400, multiline=True, min_lines=3, max_lines=6)
+    contact_value = ft.TextField(label=t("contact_value_label"), width=400)
+    message_f = ft.TextField(label=t("message_content_label"), width=400, multiline=True, min_lines=3, max_lines=6)
 
     def submit(_e):
         error_text.value = ""
@@ -245,10 +275,10 @@ def build_contact_page(page: ft.Page):
                 emp_id.value.strip(), name_f.value.strip(), email_f.value.strip(),
                 contact_method.value, contact_value.value.strip(), message_f.value.strip(),
             )
-            success_text.value = "留言已送出，管理者將盡快與您聯繫！"
+            success_text.value = t("message_sent")
             emp_id.value = name_f.value = email_f.value = contact_value.value = message_f.value = ""
         except HTTPStatusError as exc:
-            error_text.value = exc.response.json().get("detail", "送出失敗")
+            error_text.value = exc.response.json().get("detail", t("submit_failed"))
         page.update()
 
     def go_back(_e):
@@ -257,10 +287,10 @@ def build_contact_page(page: ft.Page):
     return ft.Column(
         [
             ft.Row([ft.IconButton(ft.Icons.ARROW_BACK, on_click=go_back),
-                     ft.Text("聯絡超級管理者", size=22, weight=ft.FontWeight.BOLD)]),
+                     ft.Text(t("contact_admin_title"), size=22, weight=ft.FontWeight.BOLD)]),
             emp_id, name_f, email_f, contact_method, contact_value, message_f,
             error_text, success_text,
-            ft.ElevatedButton("送出留言", bgcolor=INDIGO, color="white", width=400, on_click=submit),
+            ft.ElevatedButton(t("submit_message"), bgcolor=INDIGO, color="white", width=400, on_click=submit),
         ],
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         scroll=ft.ScrollMode.AUTO,
@@ -290,8 +320,8 @@ def build_my_leaves_page(page: ft.Page):
                 ft.Container(
                     ft.Column([
                         ft.Icon(ft.Icons.CALENDAR_TODAY, size=48, color=GRAY_200),
-                        ft.Text("尚未有任何休假記錄", size=16, weight=ft.FontWeight.W_500),
-                        ft.Text("點擊上方按鈕來新增您的第一筆預約。", size=13, color=GRAY_500),
+                        ft.Text(t("no_leaves"), size=16, weight=ft.FontWeight.W_500),
+                        ft.Text(t("no_leaves_hint"), size=13, color=GRAY_500),
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=40, alignment=ft.Alignment(0, 0),
                     border=ft.border.all(2, GRAY_200),
@@ -349,11 +379,11 @@ def build_my_leaves_page(page: ft.Page):
     return ft.Column([
         ft.Row([
             ft.Column([
-                ft.Text("我的休假清單", size=22, weight=ft.FontWeight.BOLD),
-                ft.Text("管理您的個人預約記錄。", size=13, color=GRAY_500),
+                ft.Text(t("my_leaves_title"), size=22, weight=ft.FontWeight.BOLD),
+                ft.Text(t("my_leaves_subtitle"), size=13, color=GRAY_500),
             ], expand=True),
-            ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip="重新整理", on_click=_manual_refresh),
-            ft.ElevatedButton("新增休假", icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add),
+            ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip=t("refresh"), on_click=_manual_refresh),
+            ft.ElevatedButton(t("add_leave"), icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add),
         ]),
         ft.Divider(height=1),
         leaves_list,
@@ -401,7 +431,7 @@ def build_leave_form_page(page: ft.Page):
     date_text = ft.Text(init_date, size=16)
     start_text = ft.Text(init_start, size=16)
     end_text = ft.Text(init_end, size=16)
-    note_f = ft.TextField(label="備註 (選填)", value=init_note)
+    note_f = ft.TextField(label=t("note_label"), value=init_note)
 
     def _make_picker_field(icon: str, label: str, value_text: ft.Text, on_tap) -> ft.Container:
         return ft.Container(
@@ -509,12 +539,12 @@ def build_leave_form_page(page: ft.Page):
     def _cancel(_e):
         _navigate(page, "/my-leaves")
 
-    title = "編輯休假" if is_edit else "新增休假"
+    title = t("edit_leave") if is_edit else t("add_leave")
 
     # Build tappable picker fields
-    date_row = _make_picker_field(ft.Icons.CALENDAR_MONTH, "日期", date_text, _tap_date)
-    start_row = _make_picker_field(ft.Icons.ACCESS_TIME, "開始時間", start_text, _tap_start)
-    end_row = _make_picker_field(ft.Icons.ACCESS_TIME, "結束時間", end_text, _tap_end)
+    date_row = _make_picker_field(ft.Icons.CALENDAR_MONTH, t("date_label"), date_text, _tap_date)
+    start_row = _make_picker_field(ft.Icons.ACCESS_TIME, t("start_time_label"), start_text, _tap_start)
+    end_row = _make_picker_field(ft.Icons.ACCESS_TIME, t("end_time_label"), end_text, _tap_end)
 
     return ft.Column([
         ft.Row([
@@ -533,8 +563,8 @@ def build_leave_form_page(page: ft.Page):
         form_error,
         ft.Container(height=16),
         ft.Row([
-            ft.OutlinedButton("取消", on_click=_cancel),
-            ft.ElevatedButton("儲存", bgcolor=INDIGO, color="white", on_click=_save),
+            ft.OutlinedButton(t("cancel"), on_click=_cancel),
+            ft.ElevatedButton(t("save"), bgcolor=INDIGO, color="white", on_click=_save),
         ], alignment=ft.MainAxisAlignment.END),
         ft.Container(height=8),
         debug_log,
@@ -553,16 +583,23 @@ def build_calendar_page(page: ft.Page):
 
     def _title():
         y, m, d, mode = state["year"], state["month"], state["day"], state["mode"]
+        lang = get_lang()
         if mode == "month":
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[m]} {y}"
             return f"{y}年 {m}月"
         elif mode == "week":
             dt = datetime(y, m, d)
             start = dt - timedelta(days=dt.weekday())
             end = start + timedelta(days=6)
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[m]} {y} ({start.month}/{start.day} - {end.month}/{end.day})"
             return f"{y}年 {m}月 ({start.month}/{start.day} - {end.month}/{end.day})"
         else:
-            weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             dt = datetime(y, m, d)
+            if lang == "en":
+                return f"{MONTH_NAMES_EN[m]} {d}, {y} ({WEEKDAYS_FULL_EN[dt.weekday()]})"
+            weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             return f"{y}年 {m}月 {d}日 (星期{weekdays[dt.weekday()]})"
 
     def _fetch_and_build():
@@ -578,7 +615,7 @@ def build_calendar_page(page: ft.Page):
             else:
                 _build_day_view()
         except Exception as e:
-            calendar_content.controls.append(ft.Text(f"載入失敗: {e}", color=RED))
+            calendar_content.controls.append(ft.Text(f"{t('load_failed')}: {e}", color=RED))
 
     def _refresh():
         _fetch_and_build()
@@ -586,7 +623,7 @@ def build_calendar_page(page: ft.Page):
 
     def _build_month_view():
         data = api.get_calendar_month(state["year"], state["month"])
-        weekday_headers = ["日", "一", "二", "三", "四", "五", "六"]
+        weekday_headers = t("weekdays_sun_first").split(",")
         header_row = ft.Row(
             [ft.Container(ft.Text(w, size=12, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER, color=GRAY_500),
                           height=24, alignment=ft.Alignment(0, 0), expand=True)
@@ -631,12 +668,14 @@ def build_calendar_page(page: ft.Page):
 
     def _build_week_view():
         data = api.get_calendar_week(state["year"], state["month"], state["day"])
-        for col in data["columns"]:
+        weekdays_local = t("weekdays_mon_first").split(",")
+        for idx, col in enumerate(data["columns"]):
+            label = weekdays_local[idx] if idx < len(weekdays_local) else col["weekday_label"]
             header_bg = INDIGO_LIGHT if col.get("is_today") else GRAY_100
             items: list[ft.Control] = [
                 ft.Container(
                     ft.Row([
-                        ft.Text(f"{col['weekday_label']}  {col['day_num']}", size=14, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"{label}  {col['day_num']}", size=14, weight=ft.FontWeight.BOLD),
                     ]),
                     bgcolor=header_bg, padding=8, border_radius=6,
                 ),
@@ -654,7 +693,7 @@ def build_calendar_page(page: ft.Page):
                         padding=8, border_radius=6, margin=ft.margin.only(bottom=4),
                     ))
             else:
-                items.append(ft.Text("無預約", size=12, color=GRAY_500, italic=True))
+                items.append(ft.Text(t("no_bookings"), size=12, color=GRAY_500, italic=True))
             calendar_content.controls.append(ft.Container(
                 ft.Column(items, spacing=4), padding=8,
                 border=ft.border.all(1, GRAY_200), border_radius=8,
@@ -732,13 +771,13 @@ def build_calendar_page(page: ft.Page):
         title_text,
         ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
         ft.Container(expand=True),
-        ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip="重新整理", on_click=_manual_refresh),
-        ft.OutlinedButton("今天", on_click=_today),
+        ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip=t("refresh"), on_click=_manual_refresh),
+        ft.OutlinedButton(t("today"), on_click=_today),
     ])
     nav_row2 = ft.Row([
-        ft.TextButton("月", on_click=_set_mode("month")),
-        ft.TextButton("週", on_click=_set_mode("week")),
-        ft.TextButton("日", on_click=_set_mode("day")),
+        ft.TextButton(t("month_btn"), on_click=_set_mode("month")),
+        ft.TextButton(t("week_btn"), on_click=_set_mode("week")),
+        ft.TextButton(t("day_btn"), on_click=_set_mode("day")),
     ])
 
     _page_refresh_fn[0] = _fetch_and_build  # poll calls this in worker thread
@@ -754,8 +793,8 @@ def build_calendar_page(page: ft.Page):
 
 def build_admin_login_page(page: ft.Page):
     error_text = ft.Text("", color=RED, size=13)
-    usr = ft.TextField(label="管理者帳號", width=320)
-    pwd = ft.TextField(label="管理者密碼", width=320, password=True, can_reveal_password=True)
+    usr = ft.TextField(label=t("admin_username_label"), width=320)
+    pwd = ft.TextField(label=t("admin_password_label"), width=320, password=True, can_reveal_password=True)
 
     def do_login(_e):
         error_text.value = ""
@@ -763,7 +802,7 @@ def build_admin_login_page(page: ft.Page):
             api.admin_login(usr.value.strip(), pwd.value)
             _navigate(page, "/admin")
         except HTTPStatusError as exc:
-            error_text.value = exc.response.json().get("detail", "登入失敗")
+            error_text.value = exc.response.json().get("detail", t("login_failed"))
             page.update()
 
     def go_back(_e):
@@ -772,12 +811,12 @@ def build_admin_login_page(page: ft.Page):
     return ft.Column(
         [
             ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, size=48, color=INDIGO),
-            ft.Text("超級管理者登入", size=24, weight=ft.FontWeight.BOLD),
+            ft.Text(t("admin_login_title"), size=24, weight=ft.FontWeight.BOLD),
             ft.Container(height=10),
             usr, pwd, error_text,
-            ft.ElevatedButton("管理者登入", bgcolor=INDIGO, color="white", width=320, on_click=do_login),
+            ft.ElevatedButton(t("admin_login_btn"), bgcolor=INDIGO, color="white", width=320, on_click=do_login),
             ft.Container(height=8),
-            ft.TextButton("返回使用者登入", on_click=go_back),
+            ft.TextButton(t("back_to_user_login"), on_click=go_back),
         ],
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         alignment=ft.MainAxisAlignment.CENTER,
@@ -797,10 +836,10 @@ def build_admin_page(page: ft.Page):
     users_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
     messages_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
     form_error = ft.Text("", color=RED, size=13)
-    usr_f = ft.TextField(label="帳號", width=300)
-    pwd_f = ft.TextField(label="密碼", width=300)
-    dn_f = ft.TextField(label="顯示名稱", width=300)
-    form_title = ft.Text("新增使用者", size=18, weight=ft.FontWeight.BOLD)
+    usr_f = ft.TextField(label=t("username"), width=300)
+    pwd_f = ft.TextField(label=t("password"), width=300)
+    dn_f = ft.TextField(label=t("display_name"), width=300)
+    form_title = ft.Text(t("add_user"), size=18, weight=ft.FontWeight.BOLD)
     editing_uid: list[int | None] = [None]
 
     dlg = ft.AlertDialog(modal=True, title=form_title)
@@ -819,7 +858,7 @@ def build_admin_page(page: ft.Page):
                 try:
                     api.admin_delete_user(uid)
                 except HTTPStatusError as exc:
-                    page.snack_bar = ft.SnackBar(ft.Text(exc.response.json().get("detail", "刪除失敗")))
+                    page.snack_bar = ft.SnackBar(ft.Text(exc.response.json().get("detail", t("delete_failed"))))
                     page.snack_bar.open = True
                 _refresh_users()
 
@@ -870,7 +909,7 @@ def build_admin_page(page: ft.Page):
 
     def _open_add_user(_e):
         editing_uid[0] = None
-        form_title.value = "新增使用者"
+        form_title.value = t("add_user")
         usr_f.value = pwd_f.value = dn_f.value = ""
         form_error.value = ""
         dlg.open = True
@@ -885,7 +924,7 @@ def build_admin_page(page: ft.Page):
         if not u:
             return
         editing_uid[0] = uid
-        form_title.value = "編輯使用者"
+        form_title.value = t("edit_user")
         usr_f.value = u["username"]
         pwd_f.value = ""
         dn_f.value = u["display_name"]
@@ -903,7 +942,7 @@ def build_admin_page(page: ft.Page):
             dlg.open = False
             _refresh_users()
         except HTTPStatusError as exc:
-            form_error.value = exc.response.json().get("detail", "儲存失敗")
+            form_error.value = exc.response.json().get("detail", t("save_failed"))
             page.update()
 
     def _cancel_user(_e):
@@ -912,23 +951,23 @@ def build_admin_page(page: ft.Page):
 
     dlg.content = ft.Column([usr_f, pwd_f, dn_f, form_error], tight=True, width=340)
     dlg.actions = [
-        ft.TextButton("取消", on_click=_cancel_user),
-        ft.ElevatedButton("儲存", bgcolor=INDIGO, color="white", on_click=_save_user),
+        ft.TextButton(t("cancel"), on_click=_cancel_user),
+        ft.ElevatedButton(t("save"), bgcolor=INDIGO, color="white", on_click=_save_user),
     ]
     page.overlay.append(dlg)
 
     tabs = ft.Tabs(
         selected_index=0,
         tabs=[
-            ft.Tab(text="使用者管理", content=ft.Column([
+            ft.Tab(text=t("user_management"), content=ft.Column([
                 ft.Row([
-                    ft.Text("使用者列表", size=18, weight=ft.FontWeight.BOLD, expand=True),
-                    ft.ElevatedButton("新增使用者", icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add_user),
+                    ft.Text(t("user_list"), size=18, weight=ft.FontWeight.BOLD, expand=True),
+                    ft.ElevatedButton(t("add_user"), icon=ft.Icons.ADD, bgcolor=INDIGO, color="white", on_click=_open_add_user),
                 ]),
                 users_list,
             ], expand=True)),
-            ft.Tab(text="留言管理", content=ft.Column([
-                ft.Text("留言列表", size=18, weight=ft.FontWeight.BOLD),
+            ft.Tab(text=t("message_management"), content=ft.Column([
+                ft.Text(t("message_list"), size=18, weight=ft.FontWeight.BOLD),
                 messages_list,
             ], expand=True)),
         ],
@@ -953,8 +992,8 @@ def build_admin_page(page: ft.Page):
     return ft.Column([
         ft.Row([
             ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, color=INDIGO),
-            ft.Text("超級管理者後台", size=22, weight=ft.FontWeight.BOLD, expand=True),
-            ft.OutlinedButton("登出管理", on_click=admin_logout),
+            ft.Text(t("admin_dashboard_title"), size=22, weight=ft.FontWeight.BOLD, expand=True),
+            ft.OutlinedButton(t("admin_logout"), on_click=admin_logout),
         ]),
         ft.Divider(height=1),
         tabs,
@@ -985,16 +1024,16 @@ def _navbar(page: ft.Page, active: str) -> ft.Container:
             # Row 1: logo + greeting + logout
             ft.Row([
                 ft.Icon(ft.Icons.CALENDAR_MONTH, color=INDIGO, size=20),
-                ft.Text("預約休假管理系統", weight=ft.FontWeight.BOLD, size=14),
+                ft.Text(t("app_title"), weight=ft.FontWeight.BOLD, size=14),
                 ft.Container(expand=True),
                 ft.Text(f"{api.display_name}", size=12, color=GRAY_700),
-                ft.TextButton("登出", on_click=logout,
+                ft.TextButton(t("logout"), on_click=logout,
                               style=ft.ButtonStyle(color=GRAY_500, padding=0)),
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
             # Row 2: nav tabs
             ft.Row([
-                nav_btn("我的休假", "/my-leaves"),
-                nav_btn("共用日曆", "/calendar"),
+                nav_btn(t("my_leaves_nav"), "/my-leaves"),
+                nav_btn(t("calendar_nav"), "/calendar"),
             ]),
         ], spacing=0),
         padding=ft.padding.symmetric(horizontal=12, vertical=4),
@@ -1008,7 +1047,7 @@ def _navbar(page: ft.Page, active: str) -> ft.Container:
 # ───────────────────────────────────────────────────────────────────────────
 
 def main(page: ft.Page):
-    page.title = "預約休假管理系統"
+    page.title = t("app_title")
     page.bgcolor = GRAY_50
     page.padding = 0
     # On Android emulator the default 10.0.2.2 is correct.

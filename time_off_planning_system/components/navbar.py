@@ -1,8 +1,10 @@
 import reflex as rx
 from time_off_planning_system.states.auth_state import AuthState
+from time_off_planning_system.states.lang_state import LangState
+from time_off_planning_system.i18n import t
 
 
-def nav_link(label: str, href: str, active: bool) -> rx.Component:
+def nav_link(label: rx.Var, href: str, active: bool) -> rx.Component:
     return rx.el.a(
         label,
         href=href,
@@ -22,19 +24,19 @@ def navbar() -> rx.Component:
                     rx.el.div(
                         rx.icon("calendar-check", class_name="h-8 w-8 text-indigo-600"),
                         rx.el.span(
-                            "預約休假管理系統",
+                            t("app_title"),
                             class_name="ml-2 text-xl font-bold text-gray-900",
                         ),
                         class_name="flex shrink-0 items-center",
                     ),
                     rx.el.div(
                         nav_link(
-                            "我的休假",
+                            t("my_leaves_nav"),
                             "/my-leaves",
                             AuthState.router.page.path == "/my-leaves",
                         ),
                         nav_link(
-                            "共用日曆",
+                            t("calendar_nav"),
                             "/calendar",
                             AuthState.router.page.path == "/calendar",
                         ),
@@ -44,12 +46,23 @@ def navbar() -> rx.Component:
                 ),
                 rx.el.div(
                     rx.el.div(
+                        rx.el.select(
+                            rx.el.option("繁體中文", value="zh"),
+                            rx.el.option("English", value="en"),
+                            on_change=LangState.set_lang,
+                            value=LangState.lang,
+                            class_name="rounded-md border-gray-300 shadow-sm text-sm p-1.5 border bg-white appearance-none cursor-pointer mr-4",
+                        ),
                         rx.el.span(
-                            f"你好, {AuthState.current_display_name}",
+                            rx.cond(
+                                LangState.lang == "en",
+                                "Hello, " + AuthState.current_display_name,
+                                "你好, " + AuthState.current_display_name,
+                            ),
                             class_name="text-sm font-medium text-gray-700 mr-4",
                         ),
                         rx.el.button(
-                            "登出",
+                            t("logout"),
                             on_click=AuthState.logout,
                             class_name="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50",
                         ),
