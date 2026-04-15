@@ -598,7 +598,8 @@ def build_leave_form_page(page: ft.Page):
 def build_calendar_page(page: ft.Page):
     now = datetime.now()
     state = {"year": now.year, "month": now.month, "day": now.day, "mode": "month"}
-    title_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD)
+    title_text = ft.Text("", size=20, weight=ft.FontWeight.BOLD,
+                         no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
     calendar_content = ft.Column(spacing=0)
 
     def _title():
@@ -636,10 +637,6 @@ def build_calendar_page(page: ft.Page):
                 _build_day_view()
         except Exception as e:
             calendar_content.controls.append(ft.Text(f"{t('load_failed')}: {e}", color=RED))
-
-    def _refresh():
-        _fetch_and_build()
-        page.update()
 
     def _build_month_view():
         data = api.get_calendar_month(state["year"], state["month"])
@@ -786,24 +783,78 @@ def build_calendar_page(page: ft.Page):
     def _manual_refresh(_e):
         _refresh()
 
-    nav_row1 = ft.Row([
-        ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
-        title_text,
-        ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
-        ft.Container(expand=True),
-        ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip=t("refresh"), on_click=_manual_refresh),
-        ft.OutlinedButton(t("today"), on_click=_today),
-    ])
-    nav_row2 = ft.Row([
-        ft.TextButton(t("month_btn"), on_click=_set_mode("month")),
-        ft.TextButton(t("week_btn"), on_click=_set_mode("week")),
-        ft.TextButton(t("day_btn"), on_click=_set_mode("day")),
-    ])
+    refresh_btn = ft.IconButton(ft.Icons.REFRESH, icon_color=INDIGO, tooltip=t("refresh"), on_click=_manual_refresh)
+    today_btn = ft.OutlinedButton(t("today"), on_click=_today)
+    nav_header = ft.Column(spacing=2)
 
-    _page_refresh_fn[0] = _fetch_and_build  # poll calls this in worker thread
-    _refresh()
+    def _rebuild_nav_header():
+        """Rebuild navigation header rows based on available width.
 
-    return ft.Column([nav_row1, nav_row2, ft.Divider(height=1), calendar_content],
+        On portrait phones (page.width < 500), the date title is long
+        enough to overflow a single row, so the today/refresh buttons
+        are moved to a second row.  On wider screens (landscape phones,
+        tablets, desktops) everything fits in one row.
+        """
+        narrow = (page.width or 800) < 500
+        nav_header.controls.clear()
+        if narrow:
+            # Shrink title font to fit portrait phone width
+            title_text.size = 16
+            title_text.expand = True
+            # Row 1: < date title >
+            nav_header.controls.append(ft.Row([
+                ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
+                title_text,
+                ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
+            ]))
+            # Row 2: refresh + today (below date, above mode buttons)
+            nav_header.controls.append(ft.Row([
+                ft.Container(expand=True),
+                refresh_btn,
+                today_btn,
+            ]))
+            # Row 3: month / week / day
+            nav_header.controls.append(ft.Row([
+                ft.TextButton(t("month_btn"), on_click=_set_mode("month")),
+                ft.TextButton(t("week_btn"), on_click=_set_mode("week")),
+                ft.TextButton(t("day_btn"), on_click=_set_mode("day")),
+            ]))
+        else:
+            # Restore normal title size for wide screens
+            title_text.size = 20
+            title_text.expand = False
+            # Row 1: < date title >  [expand]  refresh  today
+            nav_header.controls.append(ft.Row([
+                ft.IconButton(ft.Icons.CHEVRON_LEFT, on_click=_prev),
+                title_text,
+                ft.IconButton(ft.Icons.CHEVRON_RIGHT, on_click=_next),
+                ft.Container(expand=True),
+                refresh_btn,
+                today_btn,
+            ]))
+            # Row 2: month / week / day
+            nav_header.controls.append(ft.Row([
+                ft.TextButton(t("month_btn"), on_click=_set_mode("month")),
+                ft.TextButton(t("week_btn"), on_click=_set_mode("week")),
+                ft.TextButton(t("day_btn"), on_click=_set_mode("day")),
+            ]))
+
+    # Wrap original _fetch_and_build to also rebuild nav header layout
+    _orig_fetch_and_build = _fetch_and_build
+
+    def _fetch_and_build_responsive():
+        _rebuild_nav_header()
+        _orig_fetch_and_build()
+
+    def _refresh():
+        _fetch_and_build_responsive()
+        page.update()
+
+    _page_refresh_fn[0] = _fetch_and_build_responsive  # poll calls this in worker thread
+    _fetch_and_build_responsive()
+    page.update()
+
+    return ft.Column([nav_header, ft.Divider(height=1), calendar_content],
                      scroll=ft.ScrollMode.AUTO, expand=True)
 
 
