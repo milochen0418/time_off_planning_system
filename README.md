@@ -116,6 +116,17 @@ To fully clean the environment, reinstall all dependencies, and start the app in
 
 This will remove existing Poetry virtual environments and Reflex artifacts, recreate the environment from scratch, and automatically launch the app afterwards.
 
+### Mobile App (Flet) Setup
+
+For running the Flet mobile app on Android emulators or iOS simulators, detailed step-by-step setup guides are available:
+
+- **English:** [flet_app/HOW_TO_RUN_EN.md](flet_app/HOW_TO_RUN_EN.md)
+- **中文版:** [flet_app/HOW_TO_RUN.md](flet_app/HOW_TO_RUN.md)
+
+These guides cover installing Flutter, Android SDK, Xcode, JDK, environment variables, creating emulators/simulators, and launching the app on each platform.
+
+> **Tip:** The setup involves many tools and configuration steps. You can follow the guide manually, or paste the document to an AI assistant and ask it to help you set up the environment — it works well for this kind of task.
+
 ### macOS GUI Launcher (`launcher.sh`)
 
 `launcher.sh` is a **macOS-only** development/testing tool that provides a native AppleScript dialog for managing the app and mobile emulators. It is not required for normal use — it's a convenience wrapper for developers on macOS.
