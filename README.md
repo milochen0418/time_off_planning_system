@@ -5,6 +5,47 @@
 
 ## Usage Guide
 
+Once the app is running at `http://localhost:3000`, here's how to get started.
+
+### For Admins
+
+1. **Log in as Admin** — Go to the login page and click **"Admin Login"** at the bottom. The default admin credentials are:
+   - **Username:** `admin`
+   - **Password:** `admin`
+
+2. **Admin Dashboard** — After logging in, you'll see the Admin Dashboard with two tabs:
+   - **User Management** — Add, edit, or delete user accounts. You can create usernames and passwords for your team members here.
+   - **Message Board** — View requests from users who need account setup or password resets. Check this board regularly and create/update accounts accordingly.
+
+3. **Typical workflow:**
+   - Share the app URL with your team.
+   - Team members submit a request via the **Contact Admin** form (accessible from the login page).
+   - You review requests on the **Message Board** tab, then go to **User Management** to create their accounts.
+   - Once done, let them know their credentials so they can log in.
+
+### For Users
+
+1. **Get an account** — If you don't have an account yet:
+   - Go to the login page and click **"Contact Admin"**.
+   - Fill in your Employee ID, name, email, preferred contact method, and a message describing what you need (e.g., "Please create an account for me").
+   - The admin will create your account and share your credentials with you.
+
+2. **Self-register** — Alternatively, you can click **"Don't have an account?"** on the login page to register yourself directly.
+
+3. **Log in** — Enter your username and password on the login page.
+
+4. **My Leaves** — After logging in, you land on the **My Leaves** page where you can:
+   - **Add** a new leave by clicking the "Add Leave" button.
+   - Pick a date, set start/end times, and optionally add a note.
+   - **Edit** or **Delete** existing leave records.
+   - The system automatically detects time conflicts with your other bookings.
+
+5. **Shared Calendar** — Click **"Shared Calendar"** in the navigation bar to see everyone's scheduled leaves in one view. Switch between **Month**, **Week**, and **Day** views to plan around your team's availability.
+
+### Language
+
+The app supports **English** and **Traditional Chinese (繁體中文)**. Use the language toggle in the navigation bar to switch.
+
 
 ## Getting Started
 
