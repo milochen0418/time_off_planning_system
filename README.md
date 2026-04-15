@@ -116,5 +116,43 @@ To fully clean the environment, reinstall all dependencies, and start the app in
 
 This will remove existing Poetry virtual environments and Reflex artifacts, recreate the environment from scratch, and automatically launch the app afterwards.
 
+### macOS GUI Launcher (`launcher.sh`)
+
+`launcher.sh` is a **macOS-only** development/testing tool that provides a native AppleScript dialog for managing the app and mobile emulators. It is not required for normal use — it's a convenience wrapper for developers on macOS.
+
+```bash
+./launcher.sh
+```
+
+The launcher shows a status dashboard and lets you:
+
+| Action | What it does |
+|--------|-------------|
+| **Start / Stop Web App** | Start or kill the Reflex dev server (ports 3000 & 8000) via `poetry run ./reflex_rerun.sh` |
+| **Run on Android Emulator** | Build the Flet APK, boot an Android emulator, install & launch the app |
+| **Run on iOS Simulator** | Build the Flet iOS app, boot an iPhone simulator, install & launch the app |
+
+#### Dependencies per feature
+
+If the launcher shows no response or an error for a specific action, you likely need to install the corresponding dependencies:
+
+| Feature | Required tools | How to install |
+|---------|---------------|----------------|
+| **Web App** | `python3.11`, `poetry` | `brew install python@3.11 poetry` |
+| **Android Emulator** | Android SDK (`adb`, `emulator`, `avdmanager`), Java | Install [Android Studio](https://developer.android.com/studio) and configure `ANDROID_HOME` in your shell profile. You also need at least one AVD (Android Virtual Device) created. |
+| **iOS Simulator** | Xcode, Xcode Command Line Tools (`xcrun`, `simctl`) | Install Xcode from the App Store, then run `xcode-select --install`. At least one iPhone simulator runtime must be downloaded (Xcode → Settings → Platforms). |
+| **Flet build (both mobile)** | `flet` CLI (included in Poetry deps) | Already installed via `poetry install` |
+
+#### Troubleshooting
+
+- **Dialog doesn't appear at all** — The script uses `osascript` (AppleScript), which is only available on macOS. It will not work on Linux or Windows.
+- **"adb not found"** — Android SDK is not on your `PATH`. Make sure `ANDROID_HOME` is set in `~/.zshrc` and `$ANDROID_HOME/platform-tools` is in `PATH`.
+- **"No Android AVD found"** — Create one first, e.g.:
+  ```bash
+  avdmanager create avd -n pixel7 -k "system-images;android-34;google_apis;arm64-v8a" -d "pixel_7"
+  ```
+- **"No available iPhone simulator found"** — Open Xcode → Settings → Platforms and download a simulator runtime (e.g. iOS 17).
+- **Web app doesn't start** — Make sure ports 3000 and 8000 are free. Run `lsof -ti:3000,8000` to check for lingering processes.
+
 ---
 
